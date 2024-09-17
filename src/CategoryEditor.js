@@ -68,25 +68,12 @@ const SaveButton = styled.button`
   cursor: pointer;
 `;
 
-const ThumbnailSection = styled.div`
-  margin-top: 20px;
-  display: flex;
-  flex-direction: column;
-
-  .thumbnail-preview {
-    max-width: 200px;
-    margin-top: 10px;
-  }
-`;
-
 function CategoryEditor() {
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedCourses, setSelectedCourses] = useState([]);
   const [allCourses, setAllCourses] = useState([]);
   const [courseOrder, setCourseOrder] = useState({});
-  const [thumbnail, setThumbnail] = useState(null);
-  const [thumbnailUrl, setThumbnailUrl] = useState(""); // 미리보기 URL
   const navigate = useNavigate();
 
   const storage = getStorage(); // Firebase Storage 인스턴스
@@ -130,18 +117,15 @@ function CategoryEditor() {
       initialOrder[courseId] = index + 1;
     });
     setCourseOrder(initialOrder);
-    setThumbnailUrl(category.thumbnailUrl || ""); // 카테고리의 썸네일 URL 설정
   };
 
   const handleCourseToggle = (course) => {
     if (selectedCourses.includes(course.id)) {
-      // 선택 해제 시 순서 제거
       setSelectedCourses(selectedCourses.filter((id) => id !== course.id));
       const updatedOrder = { ...courseOrder };
       delete updatedOrder[course.id];
       setCourseOrder(updatedOrder);
     } else {
-      // 새로운 순서를 부여하고 선택된 코스에 추가
       setSelectedCourses([...selectedCourses, course.id]);
       setCourseOrder({
         ...courseOrder,
@@ -150,35 +134,12 @@ function CategoryEditor() {
     }
   };
 
-  // 썸네일 파일 선택 처리
-  const handleThumbnailChange = (e) => {
-    if (e.target.files[0]) {
-      setThumbnail(e.target.files[0]); // 썸네일 파일 저장
-      setThumbnailUrl(URL.createObjectURL(e.target.files[0])); // 미리보기 설정
-    }
-  };
-
-  // 파일 업로드 후 URL 반환 함수
-  const uploadThumbnail = async (file) => {
-    const storageRef = ref(storage, `thumbnails/${file.name}`);
-    await uploadBytes(storageRef, file);
-    return await getDownloadURL(storageRef);
-  };
-
   const saveCategory = async () => {
     if (selectedCategory) {
-      let thumbnailDownloadUrl = thumbnailUrl;
-
-      // 썸네일이 선택되었다면 Firestorage에 업로드 후 URL 얻기
-      if (thumbnail) {
-        thumbnailDownloadUrl = await uploadThumbnail(thumbnail);
-      }
-
       // 카테고리 업데이트
       const categoryDoc = doc(db, "artCategories", selectedCategory.id);
       await updateDoc(categoryDoc, {
         courseIdList: selectedCourses,
-        thumbnailUrl: thumbnailDownloadUrl, // Firestore에 썸네일 URL 저장
       });
     }
     resetForm();
@@ -192,8 +153,6 @@ function CategoryEditor() {
     setSelectedCategory(null);
     setSelectedCourses([]);
     setCourseOrder({});
-    setThumbnail(null);
-    setThumbnailUrl("");
   };
 
   return (
@@ -227,18 +186,6 @@ function CategoryEditor() {
           </Chip>
         ))}
       </CourseList>
-
-      <ThumbnailSection>
-        <label htmlFor="thumbnail">Change Thumbnail:</label>
-        <input type="file" id="thumbnail" onChange={handleThumbnailChange} />
-        {thumbnailUrl && (
-          <img
-            src={thumbnailUrl}
-            alt="Thumbnail Preview"
-            className="thumbnail-preview"
-          />
-        )}
-      </ThumbnailSection>
 
       <SaveButton onClick={saveCategory}>Update Category</SaveButton>
       <SaveButton onClick={home}>Home</SaveButton>

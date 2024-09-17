@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { collection, addDoc } from "firebase/firestore";
 import { db } from "./index";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import axios from "axios";
 import styled from "styled-components";
 
 const Section = styled.section`
@@ -62,6 +64,27 @@ const ThumbnailGroup = styled.div`
   align-items: center;
 `;
 
+const ChipContainer = styled.div`
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+`;
+
+const Chip = styled.button`
+  padding: 10px;
+  font-size: 14px;
+  border-radius: 20px;
+  border: ${(props) => (props.active ? "2px solid #007bff" : "1px solid #ccc")};
+  background-color: ${(props) => (props.active ? "#007bff" : "transparent")};
+  color: ${(props) => (props.active ? "#fff" : "#000")};
+  cursor: pointer;
+
+  &:hover {
+    background-color: #007bff;
+    color: #fff;
+  }
+`;
+
 const Button = styled.button`
   padding: 10px 20px;
   font-size: 16px;
@@ -78,6 +101,84 @@ const Button = styled.button`
   }
 `;
 
+function parseKMLFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = (event) => {
+      const xmlString = event.target.result;
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(xmlString, "text/xml");
+
+      const coordinatesElements = xmlDoc.getElementsByTagName("coordinates");
+      let coordinatesArray = [];
+
+      if (coordinatesElements.length > 0) {
+        const coordinatesText = coordinatesElements[0].textContent.trim();
+        const coordinateStrings = coordinatesText.split(" ");
+
+        coordinateStrings.forEach((coordinateString) => {
+          const [longitude, latitude] = coordinateString.split(",").map(Number);
+          if (!isNaN(latitude) && !isNaN(longitude)) {
+            coordinatesArray.push({ latitude, longitude });
+          }
+        });
+
+        resolve(coordinatesArray);
+      } else {
+        reject(new Error("No coordinates found in KML file"));
+      }
+    };
+
+    reader.onerror = (error) => reject(error);
+
+    reader.readAsText(file);
+  });
+}
+
+async function reverseGeocode(coordinate) {
+  const apiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY; // Replace with your Google Maps API key
+  const { latitude, longitude } = coordinate;
+  const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${apiKey}`;
+
+  try {
+    const response = await axios.get(url);
+    if (response.data.results.length > 0) {
+      const address = response.data.results[0].address_components;
+
+      return {
+        name: response.data.results[0].formatted_address,
+        isoCountryCode:
+          address.find((comp) => comp.types.includes("country")).short_name ||
+          "",
+        administrativeArea:
+          address.find((comp) =>
+            comp.types.includes("administrative_area_level_1")
+          ).long_name || "",
+        subAdministrativeArea:
+          address.find((comp) =>
+            comp.types.includes("administrative_area_level_2")
+          )?.long_name || "",
+        locality:
+          address.find((comp) => comp.types.includes("locality"))?.long_name ||
+          "",
+        subLocality:
+          address.find((comp) => comp.types.includes("sublocality"))
+            ?.long_name || "",
+        throughfare:
+          address.find((comp) => comp.types.includes("route"))?.long_name || "",
+        subThroughfare:
+          address.find((comp) => comp.types.includes("street_number"))
+            ?.long_name || "",
+      };
+    }
+  } catch (error) {
+    console.error("Error in reverse geocoding:", error);
+  }
+
+  return null;
+}
+
 function NewCourse() {
   const [course, setCourse] = useState({
     courseName: "",
@@ -90,6 +191,9 @@ function NewCourse() {
     thumbnailNeon: "",
     thumbnailLong: "",
     coursePaths: [],
+    locationInfo: null,
+    level: "easy", // Default course level
+    alley: "none", // Default alley type
     hotSpots: [
       {
         title: "",
@@ -98,29 +202,57 @@ function NewCourse() {
       },
     ],
   });
+
+  const [xmlFile, setXmlFile] = useState(null);
   const navigate = useNavigate();
+  const storage = getStorage();
 
-  const handleCreate = async () => {
-    try {
-      const docRef = await addDoc(collection(db, "allGPSArtCourses"), course);
-      console.log("Document written with ID: ", docRef.id);
-      navigate("/dashboard");
-    } catch (e) {
-      console.error("Error adding document: ", e);
-    }
-  };
-
-  const handleFileUpload = (e, index) => {
+  const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (file && file.name.endsWith(".kml")) {
-      // Implement XML parsing here and update course.coursePaths
+      setXmlFile(file);
+
+      try {
+        const coordinates = await parseKMLFile(file);
+
+        if (coordinates.length > 0) {
+          const locationData = await reverseGeocode(coordinates[0]);
+
+          if (locationData) {
+            setCourse((prevCourse) => ({
+              ...prevCourse,
+              coursePaths: coordinates,
+              locationInfo: locationData, // locationInfo 업데이트
+            }));
+            console.log("Location info:", locationData); // locationInfo 확인
+          }
+        }
+      } catch (error) {
+        console.error("Error parsing KML or fetching location info:", error);
+      }
     }
   };
 
-  const handleThumbnailUpload = (e, key) => {
+  const handleThumbnailUpload = async (e, field) => {
     const file = e.target.files[0];
     if (file) {
-      // Implement thumbnail upload and update course with new URL
+      try {
+        const storageRef = ref(
+          storage,
+          `thumbnails/${file.name}-${Date.now()}`
+        );
+        await uploadBytes(storageRef, file);
+        const downloadUrl = await getDownloadURL(storageRef);
+
+        setCourse((prevCourse) => ({
+          ...prevCourse,
+          [field]: downloadUrl,
+        }));
+
+        console.log(`Thumbnail uploaded and URL saved: ${downloadUrl}`);
+      } catch (error) {
+        console.error("Error uploading thumbnail:", error);
+      }
     }
   };
 
@@ -136,6 +268,23 @@ function NewCourse() {
         },
       ],
     });
+  };
+
+  const handleChipChange = (field, value) => {
+    setCourse((prevCourse) => ({
+      ...prevCourse,
+      [field]: value,
+    }));
+  };
+
+  const handleCreate = async () => {
+    try {
+      const docRef = await addDoc(collection(db, "allGPSArtCourses"), course);
+      console.log("Document written with ID: ", docRef.id);
+      navigate("/dashboard");
+    } catch (e) {
+      console.error("Error adding document: ", e);
+    }
   };
 
   return (
@@ -170,6 +319,86 @@ function NewCourse() {
         value={course.description}
         onChange={(e) => setCourse({ ...course, description: e.target.value })}
       />
+
+      {/* Course Level */}
+      <Label>Course Level</Label>
+      <ChipContainer>
+        <Chip
+          active={course.level === "easy"}
+          onClick={() => handleChipChange("level", "easy")}
+        >
+          Easy
+        </Chip>
+        <Chip
+          active={course.level === "normal"}
+          onClick={() => handleChipChange("level", "normal")}
+        >
+          Normal
+        </Chip>
+        <Chip
+          active={course.level === "hard"}
+          onClick={() => handleChipChange("level", "hard")}
+        >
+          Hard
+        </Chip>
+      </ChipContainer>
+
+      {/* Alley Type */}
+      <Label>Alley Type</Label>
+      <ChipContainer>
+        <Chip
+          active={course.alley === "none"}
+          onClick={() => handleChipChange("alley", "none")}
+        >
+          None
+        </Chip>
+        <Chip
+          active={course.alley === "few"}
+          onClick={() => handleChipChange("alley", "few")}
+        >
+          Few
+        </Chip>
+        <Chip
+          active={course.alley === "lots"}
+          onClick={() => handleChipChange("alley", "lots")}
+        >
+          Lots
+        </Chip>
+      </ChipContainer>
+
+      <Label>Location Information</Label>
+      <div>
+        <p>
+          <strong>Name:</strong> {course.locationInfo?.name || "N/A"}
+        </p>
+        <p>
+          <strong>ISO Country Code:</strong>{" "}
+          {course.locationInfo?.isoCountryCode || "N/A"}
+        </p>
+        <p>
+          <strong>Administrative Area:</strong>{" "}
+          {course.locationInfo?.administrativeArea || "N/A"}
+        </p>
+        <p>
+          <strong>Sub-Administrative Area:</strong>{" "}
+          {course.locationInfo?.subAdministrativeArea || "N/A"}
+        </p>
+        <p>
+          <strong>Locality:</strong> {course.locationInfo?.locality || "N/A"}
+        </p>
+        <p>
+          <strong>Sub-Locality:</strong>{" "}
+          {course.locationInfo?.subLocality || "N/A"}
+        </p>
+        <p>
+          <strong>Throughfare:</strong>{" "}
+          {course.locationInfo?.throughfare || "N/A"}
+        </p>
+        <p>
+          <strong>Sub-Throughfare:</strong>{" "}
+          {course.locationInfo?.subThroughfare || "N/A"}
+        </p>
+      </div>
 
       <Label>Region Display Name</Label>
       <Input
