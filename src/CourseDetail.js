@@ -4,6 +4,7 @@ import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "./index";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import styled from "styled-components";
+import axios from "axios"; // for reverse geocoding API call
 
 const Section = styled.section`
   display: flex;
@@ -63,6 +64,27 @@ const ThumbnailGroup = styled.div`
   align-items: center;
 `;
 
+const ChipContainer = styled.div`
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+`;
+
+const Chip = styled.button`
+  padding: 10px;
+  font-size: 14px;
+  border-radius: 20px;
+  border: ${(props) => (props.active ? "2px solid #007bff" : "1px solid #ccc")};
+  background-color: ${(props) => (props.active ? "#007bff" : "transparent")};
+  color: ${(props) => (props.active ? "#fff" : "#000")};
+  cursor: pointer;
+
+  &:hover {
+    background-color: #007bff;
+    color: #fff;
+  }
+`;
+
 const Button = styled.button`
   padding: 10px 20px;
   font-size: 16px;
@@ -79,7 +101,6 @@ const Button = styled.button`
   }
 `;
 
-// KML 파일을 파싱해서 좌표 추출하는 함수
 function parseKMLFile(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -115,10 +136,58 @@ function parseKMLFile(file) {
   });
 }
 
+async function reverseGeocode(coordinate) {
+  const apiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY; // Replace with your Google Maps API key
+  const { latitude, longitude } = coordinate;
+  const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${apiKey}`;
+
+  try {
+    const response = await axios.get(url);
+    if (response.data.results.length > 0) {
+      const address = response.data.results[0].address_components;
+
+      return {
+        name: response.data.results[0].formatted_address,
+        isoCountryCode:
+          address.find((comp) => comp.types.includes("country")).short_name ||
+          "",
+        administrativeArea:
+          address.find((comp) =>
+            comp.types.includes("administrative_area_level_1")
+          ).long_name || "",
+        subAdministrativeArea:
+          address.find((comp) =>
+            comp.types.includes("administrative_area_level_2")
+          )?.long_name || "",
+        locality:
+          address.find((comp) => comp.types.includes("locality"))?.long_name ||
+          "",
+        subLocality:
+          address.find((comp) => comp.types.includes("sublocality"))
+            ?.long_name || "",
+        throughfare:
+          address.find((comp) => comp.types.includes("route"))?.long_name || "",
+        subThroughfare:
+          address.find((comp) => comp.types.includes("street_number"))
+            ?.long_name || "",
+      };
+    }
+  } catch (error) {
+    console.error("Error in reverse geocoding:", error);
+  }
+
+  return null;
+}
+
 function CourseDetails() {
   const { id } = useParams();
   const [course, setCourse] = useState(null);
   const [xmlFile, setXmlFile] = useState(null);
+  const [locationInfo, setLocationInfo] = useState(null); // To store address info
+  const [centerLocation, setCenterLocation] = useState({
+    longitude: 0,
+    latitude: 0,
+  }); // For location coordinates
   const navigate = useNavigate();
   const storage = getStorage();
 
@@ -136,6 +205,117 @@ function CourseDetails() {
     fetchCourse();
   }, [id]);
 
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (file && file.name.endsWith(".kml")) {
+      setXmlFile(file);
+
+      try {
+        const coordinates = await parseKMLFile(file);
+
+        if (coordinates.length > 0) {
+          const locationData = await reverseGeocode(coordinates[0]);
+
+          if (locationData) {
+            setCourse((prevCourse) => ({
+              ...prevCourse,
+              coursePaths: coordinates,
+              locationInfo: locationData, // locationInfo 업데이트
+            }));
+            console.log("Location info:", locationData); // locationInfo 확인
+          }
+        }
+      } catch (error) {
+        console.error("Error parsing KML or fetching location info:", error);
+      }
+    }
+  };
+
+  const handleThumbnailUpload = async (e, field) => {
+    const file = e.target.files[0];
+    if (file) {
+      try {
+        const storageRef = ref(
+          storage,
+          `thumbnails/${file.name}-${Date.now()}`
+        );
+        await uploadBytes(storageRef, file);
+        const downloadUrl = await getDownloadURL(storageRef);
+
+        setCourse((prevCourse) => ({
+          ...prevCourse,
+          [field]: downloadUrl,
+        }));
+
+        console.log(`Thumbnail uploaded and URL saved: ${downloadUrl}`);
+      } catch (error) {
+        console.error("Error uploading thumbnail:", error);
+      }
+    }
+  };
+
+  const addHotSpot = () => {
+    setCourse({
+      ...course,
+      hotSpots: [
+        ...course.hotSpots,
+        {
+          title: "",
+          spotDescription: "",
+          location: { longitude: "", latitude: "" },
+        },
+      ],
+    });
+  };
+
+  // Function to handle reverse geocoding and get address info
+  const getPlaceMarks = async (latitude, longitude) => {
+    try {
+      const response = await axios.get(
+        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=YOUR_GOOGLE_MAPS_API_KEY`
+      );
+      const addressComponents = response.data.results[0].address_components;
+
+      const newPlaceMark = {
+        name:
+          addressComponents.find((comp) => comp.types.includes("route"))
+            ?.long_name || "",
+        isoCountryCode:
+          addressComponents.find((comp) => comp.types.includes("country"))
+            ?.short_name || "",
+        administrativeArea:
+          addressComponents.find((comp) =>
+            comp.types.includes("administrative_area_level_1")
+          )?.long_name || "",
+        subAdministrativeArea:
+          addressComponents.find((comp) =>
+            comp.types.includes("administrative_area_level_2")
+          )?.long_name || "",
+        locality:
+          addressComponents.find((comp) => comp.types.includes("locality"))
+            ?.long_name || "",
+        subLocality:
+          addressComponents.find((comp) => comp.types.includes("sublocality"))
+            ?.long_name || "",
+        throughfare:
+          addressComponents.find((comp) => comp.types.includes("route"))
+            ?.long_name || "",
+        subThroughfare:
+          addressComponents.find((comp) => comp.types.includes("street_number"))
+            ?.long_name || "",
+      };
+
+      setLocationInfo(newPlaceMark);
+      setCourse((prevCourse) => ({
+        ...prevCourse,
+        locationInfo: newPlaceMark, // Set locationInfo in course
+        centerLocation: { longitude, latitude }, // Update center location as well
+      }));
+    } catch (error) {
+      console.error("Error fetching address from coordinates:", error);
+    }
+  };
+
   const handleUpdate = async () => {
     if (course) {
       const docRef = doc(db, "allGPSArtCourses", id);
@@ -144,47 +324,11 @@ function CourseDetails() {
     }
   };
 
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (file && file.name.endsWith(".kml")) {
-      setXmlFile(file);
-
-      parseKMLFile(file)
-        .then((coordinates) => {
-          setCourse((prevCourse) => ({
-            ...prevCourse,
-            coursePaths: coordinates,
-          }));
-        })
-        .catch((error) => {
-          console.error("Error parsing KML file:", error);
-        });
-    }
-  };
-
-  const handleThumbnailUpload = async (e, field) => {
-    const file = e.target.files[0];
-    if (file) {
-      try {
-        // Firebase Storage에 파일 업로드
-        const storageRef = ref(
-          storage,
-          `thumbnails/${file.name}-${Date.now()}`
-        );
-        await uploadBytes(storageRef, file);
-        const downloadUrl = await getDownloadURL(storageRef);
-
-        // Firestore에 저장하기 전에 course 상태 업데이트
-        setCourse((prevCourse) => ({
-          ...prevCourse,
-          [field]: downloadUrl, // Firebase Storage에서 얻은 URL을 해당 필드에 저장
-        }));
-
-        console.log(`Thumbnail uploaded and URL saved: ${downloadUrl}`);
-      } catch (error) {
-        console.error("Error uploading thumbnail:", error);
-      }
-    }
+  const handleChipChange = (field, value) => {
+    setCourse((prevCourse) => ({
+      ...prevCourse,
+      [field]: value,
+    }));
   };
 
   if (!course) return <p>Loading...</p>;
@@ -221,6 +365,109 @@ function CourseDetails() {
         value={course.description}
         onChange={(e) => setCourse({ ...course, description: e.target.value })}
       />
+
+      <Label>Distance (km)</Label>
+      <Input
+        type="number"
+        value={course.distance}
+        onChange={(e) => setCourse({ ...course, distance: e.target.value })}
+      />
+
+      <Label>Heading</Label>
+      <Input
+        type="number"
+        value={course.heading}
+        onChange={(e) => setCourse({ ...course, heading: e.target.value })}
+      />
+
+      <Label>Course Level</Label>
+      <ChipContainer>
+        <Chip
+          active={course.level === "easy"}
+          onClick={() => handleChipChange("level", "easy")}
+        >
+          Easy
+        </Chip>
+        <Chip
+          active={course.level === "normal"}
+          onClick={() => handleChipChange("level", "normal")}
+        >
+          Normal
+        </Chip>
+        <Chip
+          active={course.level === "hard"}
+          onClick={() => handleChipChange("level", "hard")}
+        >
+          Hard
+        </Chip>
+      </ChipContainer>
+
+      <Label>Alley Type</Label>
+      <ChipContainer>
+        <Chip
+          active={course.alley === "none"}
+          onClick={() => handleChipChange("alley", "none")}
+        >
+          None
+        </Chip>
+        <Chip
+          active={course.alley === "few"}
+          onClick={() => handleChipChange("alley", "few")}
+        >
+          Few
+        </Chip>
+        <Chip
+          active={course.alley === "lots"}
+          onClick={() => handleChipChange("alley", "lots")}
+        >
+          Lots
+        </Chip>
+      </ChipContainer>
+
+      {/* Location Info */}
+      <Label>Center Location (Longitude, Latitude)</Label>
+      <Input
+        type="text"
+        value={`${centerLocation.longitude}, ${centerLocation.latitude}`}
+        onChange={(e) => {
+          const [longitude, latitude] = e.target.value.split(",").map(Number);
+          setCenterLocation({ longitude, latitude });
+          getPlaceMarks(latitude, longitude); // Fetch address from coordinates
+        }}
+      />
+      <Label>Location Information</Label>
+      <div>
+        <p>
+          <strong>Name:</strong> {course.locationInfo?.name || "N/A"}
+        </p>
+        <p>
+          <strong>ISO Country Code:</strong>{" "}
+          {course.locationInfo?.isoCountryCode || "N/A"}
+        </p>
+        <p>
+          <strong>Administrative Area:</strong>{" "}
+          {course.locationInfo?.administrativeArea || "N/A"}
+        </p>
+        <p>
+          <strong>Sub-Administrative Area:</strong>{" "}
+          {course.locationInfo?.subAdministrativeArea || "N/A"}
+        </p>
+        <p>
+          <strong>Locality:</strong> {course.locationInfo?.locality || "N/A"}
+        </p>
+        <p>
+          <strong>Sub-Locality:</strong>{" "}
+          {course.locationInfo?.subLocality || "N/A"}
+        </p>
+        <p>
+          <strong>Throughfare:</strong>{" "}
+          {course.locationInfo?.throughfare || "N/A"}
+        </p>
+        <p>
+          <strong>Sub-Throughfare:</strong>{" "}
+          {course.locationInfo?.subThroughfare || "N/A"}
+        </p>
+      </div>
 
       <Label>Region Display Name</Label>
       <Input
@@ -279,7 +526,6 @@ function CourseDetails() {
 
       <Label>Course Paths (Upload KML)</Label>
       <FileInput type="file" onChange={handleFileUpload} accept=".kml" />
-
       <Label>Hot Spots</Label>
       {course.hotSpots.map((spot, index) => (
         <div key={index}>
@@ -319,6 +565,7 @@ function CourseDetails() {
           />
         </div>
       ))}
+      <Button onClick={addHotSpot}>Add Another Hot Spot</Button>
 
       <Button onClick={handleUpdate}>Update Course</Button>
     </Section>
