@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "./index";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import styled from "styled-components";
 
 const Section = styled.section`
@@ -78,11 +79,48 @@ const Button = styled.button`
   }
 `;
 
+// KML 파일을 파싱해서 좌표 추출하는 함수
+function parseKMLFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = (event) => {
+      const xmlString = event.target.result;
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(xmlString, "text/xml");
+
+      const coordinatesElements = xmlDoc.getElementsByTagName("coordinates");
+      let coordinatesArray = [];
+
+      if (coordinatesElements.length > 0) {
+        const coordinatesText = coordinatesElements[0].textContent.trim();
+        const coordinateStrings = coordinatesText.split(" ");
+
+        coordinateStrings.forEach((coordinateString) => {
+          const [longitude, latitude] = coordinateString.split(",").map(Number);
+          if (!isNaN(latitude) && !isNaN(longitude)) {
+            coordinatesArray.push({ latitude, longitude });
+          }
+        });
+
+        resolve(coordinatesArray);
+      } else {
+        reject(new Error("No coordinates found in KML file"));
+      }
+    };
+
+    reader.onerror = (error) => reject(error);
+
+    reader.readAsText(file);
+  });
+}
+
 function CourseDetails() {
   const { id } = useParams();
   const [course, setCourse] = useState(null);
   const [xmlFile, setXmlFile] = useState(null);
   const navigate = useNavigate();
+  const storage = getStorage();
 
   useEffect(() => {
     const fetchCourse = async () => {
@@ -110,14 +148,42 @@ function CourseDetails() {
     const file = e.target.files[0];
     if (file && file.name.endsWith(".kml")) {
       setXmlFile(file);
-      // Implement XML parsing here and update course.coursePaths
+
+      parseKMLFile(file)
+        .then((coordinates) => {
+          setCourse((prevCourse) => ({
+            ...prevCourse,
+            coursePaths: coordinates,
+          }));
+        })
+        .catch((error) => {
+          console.error("Error parsing KML file:", error);
+        });
     }
   };
 
-  const handleThumbnailUpload = (e, index) => {
+  const handleThumbnailUpload = async (e, field) => {
     const file = e.target.files[0];
     if (file) {
-      // Implement thumbnail upload and update course with new URL
+      try {
+        // Firebase Storage에 파일 업로드
+        const storageRef = ref(
+          storage,
+          `thumbnails/${file.name}-${Date.now()}`
+        );
+        await uploadBytes(storageRef, file);
+        const downloadUrl = await getDownloadURL(storageRef);
+
+        // Firestore에 저장하기 전에 course 상태 업데이트
+        setCourse((prevCourse) => ({
+          ...prevCourse,
+          [field]: downloadUrl, // Firebase Storage에서 얻은 URL을 해당 필드에 저장
+        }));
+
+        console.log(`Thumbnail uploaded and URL saved: ${downloadUrl}`);
+      } catch (error) {
+        console.error("Error uploading thumbnail:", error);
+      }
     }
   };
 
@@ -178,7 +244,7 @@ function CourseDetails() {
           <Label>Main</Label>
           <FileInput
             type="file"
-            onChange={(e) => handleThumbnailUpload(e, 0)}
+            onChange={(e) => handleThumbnailUpload(e, "thumbnail")}
             accept="image/*"
           />
           {course.thumbnail && (
@@ -190,7 +256,7 @@ function CourseDetails() {
           <Label>Neon</Label>
           <FileInput
             type="file"
-            onChange={(e) => handleThumbnailUpload(e, 1)}
+            onChange={(e) => handleThumbnailUpload(e, "thumbnailNeon")}
             accept="image/*"
           />
           {course.thumbnailNeon && (
@@ -202,7 +268,7 @@ function CourseDetails() {
           <Label>Long</Label>
           <FileInput
             type="file"
-            onChange={(e) => handleThumbnailUpload(e, 2)}
+            onChange={(e) => handleThumbnailUpload(e, "thumbnailLong")}
             accept="image/*"
           />
           {course.thumbnailLong && (
@@ -211,7 +277,7 @@ function CourseDetails() {
         </ThumbnailGroup>
       </ThumbnailContainer>
 
-      <Label>Course Paths (Upload XML)</Label>
+      <Label>Course Paths (Upload KML)</Label>
       <FileInput type="file" onChange={handleFileUpload} accept=".kml" />
 
       <Label>Hot Spots</Label>

@@ -261,6 +261,10 @@ function Dashboard() {
     navigate(`/add`);
   };
 
+  const handleEditCategory = () => {
+    navigate(`/categoryeditor`);
+  };
+
   return (
     <DashboardPage>
       <Section>
@@ -269,6 +273,9 @@ function Dashboard() {
           <h1> OUTLINE </h1>
           <AddCourseButton onClick={handleAddCourse}>
             Add New Course
+          </AddCourseButton>
+          <AddCourseButton onClick={handleEditCategory}>
+            Edit Category
           </AddCourseButton>
         </Top>
 
