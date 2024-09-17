@@ -8,6 +8,7 @@ import reportWebVitals from "./reportWebVitals";
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
@@ -22,6 +23,7 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const storage = getStorage(app);
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(<App />);
@@ -32,4 +34,4 @@ root.render(<App />);
 reportWebVitals();
 
 // Export the Firestore database instance for use in other files
-export { db };
+export { db, storage };
