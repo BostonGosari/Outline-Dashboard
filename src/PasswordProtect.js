@@ -14,28 +14,27 @@ const PasswordContainer = styled.div`
 const Input = styled.input`
   padding: 10px;
   font-size: 16px;
-  border-radius: 5px;
-  border: 1px solid #ccc;
+  border: 1px solid black;
   width: 300px;
   margin-bottom: 20px;
 
   &:focus {
     outline: none;
-    border-color: #007bff;
+    border-color: black;
   }
 `;
-
+const Title = styled.h3``;
 const Button = styled.button`
   padding: 10px 20px;
   font-size: 16px;
   border: none;
   border-radius: 5px;
   cursor: pointer;
-  background-color: #007bff;
+  background-color: black;
   color: white;
 
   &:hover {
-    background-color: #0056b3;
+    background-color: gray;
   }
 `;
 
@@ -66,12 +65,12 @@ function PasswordProtect() {
 
   return (
     <PasswordContainer>
-      <h1>Enter Password to Access Dashboard</h1>
+      <Title>보스턴고사리 외 출입금지 🪴</Title>
       <Input
         type="password"
         value={inputPassword}
         onChange={(e) => setInputPassword(e.target.value)}
-        placeholder="Enter password"
+        placeholder="암호를 대시오"
       />
       <Button onClick={handleLogin}>Login</Button>
       {error && <Error>{error}</Error>}
