@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { collection, addDoc } from "firebase/firestore";
+import { collection, addDoc, updateDoc } from "firebase/firestore";
 import { db } from "./index";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import axios from "axios";
@@ -182,14 +182,20 @@ async function reverseGeocode(coordinate) {
 function NewCourse() {
   const [course, setCourse] = useState({
     courseName: "",
-    courseLength: "",
-    courseDuration: "",
+    courseLength: 0,
+    courseDuration: 0,
     description: "",
+    title: "",
+    centerLocation: "",
+    startLocation: "",
+    navigation: [],
     regionDisplayName: "",
     producer: "",
     thumbnail: "",
     thumbnailNeon: "",
     thumbnailLong: "",
+    distance: 0,
+    heading: 0,
     coursePaths: [],
     locationInfo: null,
     level: "easy", // Default course level
@@ -222,9 +228,12 @@ function NewCourse() {
             setCourse((prevCourse) => ({
               ...prevCourse,
               coursePaths: coordinates,
-              locationInfo: locationData, // locationInfo 업데이트
+              locationInfo: locationData,
+              startLocation: coordinates[0], // 첫 번째 좌표를 startLocation으로 설정
+              centerLocation: coordinates[0], // 첫 번째 좌표를 centerLocation으로 설정
             }));
             console.log("Location info:", locationData); // locationInfo 확인
+            console.log("Coordinates:", coordinates); // 좌표 확인
           }
         }
       } catch (error) {
@@ -279,8 +288,46 @@ function NewCourse() {
 
   const handleCreate = async () => {
     try {
-      const docRef = await addDoc(collection(db, "allGPSArtCourses"), course);
+      // 핫스팟 필드가 비어있으면 빈 배열로 설정
+      const finalHotSpots = course.hotSpots.every(
+        (spot) =>
+          !spot.title &&
+          !spot.spotDescription &&
+          (!spot.location.latitude || !spot.location.longitude)
+      )
+        ? []
+        : course.hotSpots;
+
+      const courseWithValidHotSpots = {
+        ...course,
+        hotSpots: finalHotSpots,
+      };
+
+      const finalCourse = {
+        ...courseWithValidHotSpots,
+        courseDuration: parseFloat(course.courseDuration), // 숫자로 변환
+        courseLength: parseFloat(course.courseLength), // 숫자로 변환
+        hotSpots: finalHotSpots,
+      };
+
+      // 문서 생성 후 docRef 반환
+      const docRef = await addDoc(
+        collection(db, "allGPSArtCourses"),
+        finalCourse
+      );
+
+      // 생성된 코스의 ID를 course 상태에 업데이트
+      setCourse((prevCourse) => ({
+        ...prevCourse,
+        id: docRef.id, // 생성된 ID를 필드에 넣음
+      }));
+
       console.log("Document written with ID: ", docRef.id);
+
+      // 업데이트된 course 데이터를 다시 Firestore에 저장 (선택 사항)
+      await updateDoc(docRef, { id: docRef.id });
+
+      // 생성 완료 후 대시보드로 이동
       navigate("/dashboard");
     } catch (e) {
       console.error("Error adding document: ", e);
