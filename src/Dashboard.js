@@ -3,6 +3,7 @@ import styled from "styled-components";
 import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 import { db } from "./index";
 import { useNavigate } from "react-router-dom";
+import CategoryEditor from "./CategoryEditor";
 
 const DashboardPage = styled.div`
   width: 100%;
@@ -16,8 +17,8 @@ const DashboardPage = styled.div`
 const Section = styled.section`
   display: flex;
   flex-direction: column;
-  font-family: "SF Pro", sans-serif;
-  min-width: 1140px;
+  max-width: 1000px;
+  width: 100%;
   padding: 20px;
   margin: 0px auto;
 
@@ -44,8 +45,9 @@ const Chips = styled.div`
 `;
 
 const Chip = styled.button`
-  padding: 10px 20px;
-  font-size: 14px;
+  font-family: "NanumSquare";
+  padding: 5px 10px;
+  font-size: 12px;
   border: none;
   border-radius: 20px;
   cursor: pointer;
@@ -61,15 +63,15 @@ const Chip = styled.button`
 const SearchContainer = styled.div`
   display: flex;
   align-items: center;
-  gap: 10px;
+  /* gap: 10px; */
 `;
 
 const SearchInput = styled.input`
-  padding: 10px;
+  padding: 7px;
   font-size: 14px;
-  border: 1px solid #ccc;
-  border-radius: 20px;
-  width: 200px;
+  border: 1px solid black;
+
+  width: 150px;
 
   &:focus {
     outline: none;
@@ -78,12 +80,12 @@ const SearchInput = styled.input`
 `;
 
 const SearchButton = styled.button`
-  padding: 10px 20px;
+  padding: 8px 10px;
   font-size: 14px;
   border: none;
-  border-radius: 20px;
+
   cursor: pointer;
-  background-color: gray;
+  background-color: black;
   color: white;
 
   &:hover {
@@ -93,7 +95,7 @@ const SearchButton = styled.button`
 
 const CourseGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 0; /* Remove the gap to ensure borders meet directly */
   margin-top: 20px;
 `;
@@ -106,11 +108,11 @@ const CourseItem = styled.div`
   background-color: #fff;
   box-sizing: border-box;
 
-  &:not(:nth-child(4n + 1)) {
+  &:not(:nth-child(5n + 1)) {
     border-left: none;
   }
 
-  &:not(:nth-last-child(-n + 4)) {
+  &:not(:nth-last-child(-n + 5)) {
     border-bottom: none;
   }
 `;
@@ -118,57 +120,51 @@ const CourseItem = styled.div`
 const CourseDetails = styled.div`
   display: flex;
   flex-direction: column;
-  margin-bottom: 15px;
 `;
 
 const CourseTitle = styled.h2`
-  font-size: 18px;
+  font-size: 16px;
   margin: 0;
   font-weight: bold;
   color: #333;
 `;
 
 const CourseLength = styled.p`
-  font-size: 14px;
+  font-size: 12px;
   margin: 5px 0 0 0;
   color: #555;
 `;
 
 const CourseInfo = styled.div`
   display: flex;
-  justify-content: space-between;
+
   width: 100%;
   align-items: center;
+
+  align-items: flex-start;
+  flex-direction: column;
 `;
 
 const CourseImage = styled.img`
   width: 100%;
   height: auto;
-  border-radius: 5px;
+
   margin-bottom: 10px;
 `;
 
-const Button = styled.button`
-  font-size: 12px;
-  border: none;
-  cursor: pointer;
-  border: solid 1px black;
-  border-radius: 30px;
-  background-color: white;
-  color: black;
-  align-self: flex-start;
-`;
-
 const AddCourseButton = styled.button`
-  padding: 10px 20px;
-  font-size: 16px;
+  width: 40px;
+  height: 40px;
+  font-size: 30px;
+  font-weight: 200;
   border: none;
-  border-radius: 20px;
+  border-radius: 50%;
   cursor: pointer;
   background-color: black;
   color: white;
-
-  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 
   &:hover {
     background-color: #218838;
@@ -245,6 +241,8 @@ function Dashboard() {
       );
     }
 
+    filtered.sort((a, b) => a.courseName.localeCompare(b.courseName));
+
     setFilteredCourses(filtered);
     setSelectedCategory(categoryName);
   };
@@ -264,19 +262,16 @@ function Dashboard() {
   const handleEditCategory = () => {
     navigate(`/categoryeditor`);
   };
-
+  const [isShowing, setIsShowing] = useState(false);
+  const openModal = () => {
+    setIsShowing(true);
+  };
   return (
     <DashboardPage>
       <Section>
         <Top>
-          {" "}
           <h1> OUTLINE </h1>
-          <AddCourseButton onClick={handleAddCourse}>
-            Add New Course
-          </AddCourseButton>
-          <AddCourseButton onClick={handleEditCategory}>
-            Edit Category
-          </AddCourseButton>
+          <AddCourseButton onClick={handleAddCourse}>+</AddCourseButton>
         </Top>
 
         <TopBar>
@@ -298,11 +293,11 @@ function Dashboard() {
                 {category.title}
               </Chip>
             ))}
+            <Chip onClick={() => openModal()}>⚙️</Chip>
           </Chips>
           <SearchContainer>
             <SearchInput
               type="text"
-              placeholder="Search courses"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -311,7 +306,10 @@ function Dashboard() {
         </TopBar>
         <CourseGrid>
           {filteredCourses.map((course) => (
-            <CourseItem key={course.id}>
+            <CourseItem
+              key={course.id}
+              onClick={() => handleReadMore(course.id)}
+            >
               <CourseImage
                 src={course.thumbnail || "https://via.placeholder.com/150"}
                 alt={course.courseName}
@@ -319,16 +317,16 @@ function Dashboard() {
               <CourseDetails>
                 <CourseInfo>
                   <CourseTitle>{course.courseName}</CourseTitle>
-                  <CourseLength>{`Length: ${course.courseLength} km`}</CourseLength>
+                  <CourseLength>{`${course.regionDisplayName} `}</CourseLength>
                 </CourseInfo>
               </CourseDetails>
-              <Button onClick={() => handleReadMore(course.id)}>
-                Read More
-              </Button>
             </CourseItem>
           ))}
         </CourseGrid>
       </Section>
+      <div>
+        {isShowing != "" ? <CategoryEditor onClose={setIsShowing} /> : null}
+      </div>
     </DashboardPage>
   );
 }
