@@ -122,7 +122,6 @@ const Error = styled.p`
   color: red;
   margin-top: 10px;
 `;
-
 function PasswordProtect() {
   const [inputPassword, setInputPassword] = useState("");
   const [isAuthorized, setIsAuthorized] = useState(false);
@@ -144,13 +143,18 @@ function PasswordProtect() {
   const [lastPosition, setLastPosition] = useState(null);
 
   useEffect(() => {
+    if (!canvasRef.current) return; // 🛠️ canvas 존재 확인
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
+    if (!ctx) return; // 🛠️ getContext 존재 확인
     ctxRef.current = ctx;
 
     const resizeCanvas = () => {
+      if (!canvasRef.current) return;
       const tempCanvas = document.createElement("canvas");
       const tempCtx = tempCanvas.getContext("2d");
+      if (!tempCtx) return;
+
       tempCanvas.width = canvas.width;
       tempCanvas.height = canvas.height;
       tempCtx.drawImage(canvas, 0, 0);
@@ -164,6 +168,7 @@ function PasswordProtect() {
     window.addEventListener("resize", resizeCanvas);
 
     const draw = (event) => {
+      if (!canvasRef.current) return;
       if (!lastPosition) {
         setLastPosition({ x: event.clientX, y: event.clientY });
         return;
@@ -194,7 +199,7 @@ function PasswordProtect() {
     <PasswordContainer>
       <BackgroundMap src={backmap} />
       <Overlay />
-      <Canvas ref={canvasRef} />
+      {!isAuthorized && <Canvas ref={canvasRef} />}
       <BackgroundImg src={appui} />
 
       <Content>
