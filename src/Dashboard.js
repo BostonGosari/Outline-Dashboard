@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useSelector, useDispatch } from "react-redux";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "./index";
@@ -13,6 +14,7 @@ import styled from "styled-components";
 
 import { useNavigate } from "react-router-dom";
 import CategoryEditor from "./CategoryEditor";
+
 const DashboardPage = styled.div`
   width: 100%;
   height: 100%;
@@ -99,7 +101,7 @@ const SearchButton = styled.button`
   }
 `;
 
-const CourseGrid = styled.div`
+const CourseGrid = styled(motion.div)`
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 0;
@@ -288,21 +290,25 @@ function Dashboard() {
           </SearchContainer>
         </TopBar>
         <CourseGrid>
-          {filteredCourses.map((course) => (
-            <CourseItem
-              key={course.id}
-              onClick={() => handleReadMore(course.id)}
-            >
-              <CourseImage
-                src={course.thumbnail || "https://via.placeholder.com/150"}
-                alt={course.courseName}
-              />
-              <CourseDetails>
-                <CourseTitle>{course.courseName}</CourseTitle>
-                <CourseLength>{course.regionDisplayName}</CourseLength>
-              </CourseDetails>
-            </CourseItem>
-          ))}
+          <AnimatePresence mode="wait">
+            {filteredCourses.map((course) => (
+              <motion.div
+                key={course.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.5 }}
+              >
+                <CourseItem onClick={() => handleReadMore(course.id)}>
+                  <CourseImage src={course.thumbnail} alt={course.courseName} />
+                  <CourseDetails>
+                    <CourseTitle>{course.courseName}</CourseTitle>
+                    <CourseLength>{course.regionDisplayName}</CourseLength>
+                  </CourseDetails>
+                </CourseItem>
+              </motion.div>
+            ))}
+          </AnimatePresence>
         </CourseGrid>
       </Section>
       <div>
