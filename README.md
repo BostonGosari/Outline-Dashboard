@@ -11,7 +11,7 @@
 
 ## 🛠️ Tech Stack
 
-- **Frontend**: React, Redux Toolkit, Styled Components
+- **Frontend**: React, Redux Toolkit, Styled Components, motion-framer
 - **Backend**: Firebase (Firestore & Storage)
 - **Routing**: React Router
 - **State Management**: Redux Toolkit
