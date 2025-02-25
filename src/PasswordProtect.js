@@ -1,14 +1,80 @@
-import React, { useState } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import styled from "styled-components";
+import cursorImg from "./assets/img/cursor.png";
+import appui from "./assets/img/appui.png";
+import backmap from "./assets/img/backmap.png";
 import Dashboard from "./Dashboard";
 
 const PasswordContainer = styled.div`
+  cursor: url(${cursorImg}) 2 2, auto !important;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   height: 100vh;
+  width: 100vw;
   font-family: "SF Pro", sans-serif;
+  position: relative;
+  background-color: white;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+
+  * {
+    cursor: inherit !important;
+  }
+`;
+const Overlay = styled.div`
+  cursor: url(${cursorImg}) 2 2, auto;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 1;
+`;
+
+const Canvas = styled.canvas`
+  cursor: url(${cursorImg}) 2 2, auto;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1;
+  pointer-events: none;
+`;
+const BackgroundMap = styled.img`
+  cursor: url(${cursorImg}) 2 2, auto;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+`;
+const BackgroundImg = styled.img`
+  cursor: url(${cursorImg}) 2 2, auto;
+  position: fixed;
+  top: 20%;
+  left: 15%;
+  width: 40vw;
+  /* height: 100vh; */
+  z-index: 2;
+  pointer-events: none;
+`;
+
+const Content = styled.div`
+  position: relative;
+  margin-top: 0%;
+  margin-left: 50%;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 `;
 
 const Input = styled.input`
@@ -17,21 +83,35 @@ const Input = styled.input`
   border: 1px solid black;
   width: 300px;
   margin-bottom: 20px;
+  cursor: url(${cursorImg}) 2 2, auto;
+  background: white;
+  z-index: 2;
 
   &:focus {
     outline: none;
     border-color: black;
   }
 `;
-const Title = styled.h3``;
+const Title = styled.h3`
+  color: white;
+  z-index: 2;
+  font-size: 36px;
+`;
+
+const SubTitle = styled.h3`
+  color: white;
+  z-index: 2;
+`;
+
 const Button = styled.button`
   padding: 10px 20px;
   font-size: 16px;
   border: none;
   border-radius: 5px;
-  cursor: pointer;
+  cursor: url(${cursorImg}) 2 2, auto;
   background-color: black;
   color: white;
+  z-index: 2;
 
   &:hover {
     background-color: gray;
@@ -59,21 +139,79 @@ function PasswordProtect() {
     }
   };
 
+  const canvasRef = useRef(null);
+  const ctxRef = useRef(null);
+  const [lastPosition, setLastPosition] = useState(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    ctxRef.current = ctx;
+
+    const resizeCanvas = () => {
+      const tempCanvas = document.createElement("canvas");
+      const tempCtx = tempCanvas.getContext("2d");
+      tempCanvas.width = canvas.width;
+      tempCanvas.height = canvas.height;
+      tempCtx.drawImage(canvas, 0, 0);
+
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      ctx.drawImage(tempCanvas, 0, 0);
+    };
+
+    resizeCanvas();
+    window.addEventListener("resize", resizeCanvas);
+
+    const draw = (event) => {
+      if (!lastPosition) {
+        setLastPosition({ x: event.clientX, y: event.clientY });
+        return;
+      }
+      ctx.strokeStyle = "#D5FF5D";
+      ctx.lineWidth = 7;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(lastPosition.x, lastPosition.y);
+      ctx.lineTo(event.clientX, event.clientY);
+      ctx.stroke();
+      setLastPosition({ x: event.clientX, y: event.clientY });
+    };
+
+    window.addEventListener("mousemove", draw);
+
+    return () => {
+      window.removeEventListener("mousemove", draw);
+      window.removeEventListener("resize", resizeCanvas);
+    };
+  }, [lastPosition]);
+
   if (isAuthorized) {
     return <Dashboard />;
   }
 
   return (
     <PasswordContainer>
-      <Title>보스턴고사리 외 출입금지 🪴</Title>
-      <Input
-        type="password"
-        value={inputPassword}
-        onChange={(e) => setInputPassword(e.target.value)}
-        placeholder="암호를 대시오"
-      />
-      <Button onClick={handleLogin}>Login</Button>
-      {error && <Error>{error}</Error>}
+      <BackgroundMap src={backmap} />
+      <Overlay />
+      <Canvas ref={canvasRef} />
+      <BackgroundImg src={appui} />
+
+      <Content>
+        <Title>
+          OUTLINE<br></br>내 발걸음을 그림으로.
+        </Title>
+
+        <SubTitle>우리 고사리들 늘 화이팅 🪴 -HANI- </SubTitle>
+        <Input
+          type="password"
+          value={inputPassword}
+          onChange={(e) => setInputPassword(e.target.value)}
+          placeholder="암호를 대시오"
+        />
+        <Button onClick={handleLogin}>Login</Button>
+        {error && <Error>{error}</Error>}
+      </Content>
     </PasswordContainer>
   );
 }
