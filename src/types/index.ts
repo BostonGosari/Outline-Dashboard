@@ -51,6 +51,12 @@ export interface RootState {
     loading: boolean;
     error: string | null;
   };
+  course: {
+    selectedCourse: Course | null;
+    hotSpots: HotSpot[];
+    loading: boolean;
+    error: string | null;
+  };
 }
 
 export interface StyledProps {
