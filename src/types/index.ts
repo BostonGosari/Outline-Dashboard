@@ -57,6 +57,12 @@ export interface RootState {
     loading: boolean;
     error: string | null;
   };
+  ui: {
+    isModalOpen: boolean;
+    modalType: string | null;
+    isLoading: boolean;
+    error: string | null;
+  };
 }
 
 export interface StyledProps {
