@@ -6,6 +6,7 @@ import backmap from "./assets/img/backmap.png";
 import Dashboard from "./Dashboard";
 import { PasswordProtectProps } from "./types";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from './context/AuthContext';
 
 const PasswordContainer = styled.div`
   cursor: url(${cursorImg}) 2 2, auto !important;
@@ -135,6 +136,7 @@ const PasswordProtect: React.FC<PasswordProtectProps> = ({ onLogin }) => {
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const [lastPosition, setLastPosition] = useState<{ x: number; y: number } | null>(null);
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -142,6 +144,7 @@ const PasswordProtect: React.FC<PasswordProtectProps> = ({ onLogin }) => {
       if (onLogin) {
         onLogin(true);
       }
+      login();
       navigate("/dashboard");
     } else {
       setError("비밀번호가 올바르지 않습니다.");
