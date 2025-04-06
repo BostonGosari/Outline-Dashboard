@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useSelector, useDispatch } from "react-redux";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "./index";
 import {
@@ -8,12 +7,12 @@ import {
   setAllCourses,
   setFilteredCourses,
   setSelectedCategory,
-  setSearchTerm,
 } from "./features/categorySlice";
 import styled from "styled-components";
-
 import { useNavigate } from "react-router-dom";
 import CategoryEditor from "./CategoryEditor";
+import { useAppDispatch, useAppSelector } from "./app/hooks";
+import { Category, Course, StyledProps } from "./types";
 
 const DashboardPage = styled.div`
   width: 100%;
@@ -55,7 +54,7 @@ const Chips = styled.div`
   gap: 10px;
 `;
 
-const Chip = styled.button`
+const Chip = styled.button<StyledProps>`
   font-family: "NanumSquare";
   padding: 5px 10px;
   font-size: 12px;
@@ -168,72 +167,63 @@ const AddCourseButton = styled.button`
   }
 `;
 
-function Dashboard() {
-  const dispatch = useDispatch();
+const Dashboard: React.FC = () => {
+  const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const {
     categories,
     allCourses,
     filteredCourses,
     selectedCategory,
-    searchTerm,
-  } = useSelector((state) => state.category);
+  } = useAppSelector((state) => state.category);
 
-  const [isShowing, setIsShowing] = useState(false); // 모달 상태 추가
+  const [isShowing, setIsShowing] = useState<boolean>(false);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const filterCourses = useCallback(
+    (categoryName: string, allCategories: Category[], allCourses: Course[]) => {
+      let filtered = categoryName === "All" ? allCourses : [];
+      if (categoryName !== "All") {
+        const selectedCat = allCategories.find(
+          (cat) => cat.title === categoryName
+        );
+        if (selectedCat) {
+          filtered = (selectedCat.courseDetails || []).filter((course): course is Course => course !== null);
+        }
+      }
+      filtered = filtered.filter((course) =>
+        course.courseName.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      dispatch(setFilteredCourses(filtered));
+      dispatch(setSelectedCategory(categoryName));
+    },
+    [dispatch, searchTerm]
+  );
 
   useEffect(() => {
-    const fetchData = async () => {
-      const allCoursesSnapshot = await getDocs(
-        collection(db, "allGPSArtCourses")
-      );
-      const allCoursesData = allCoursesSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      dispatch(setAllCourses(allCoursesData));
-
+    const fetchCategoriesAndCourses = async () => {
       const categoriesSnapshot = await getDocs(collection(db, "artCategories"));
-      const categoryList = categoriesSnapshot.docs.map((doc) => ({
+      const categoriesData = categoriesSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
-      }));
+      })) as Category[];
 
-      // 각 카테고리에 courseDetails 추가
-      const updatedCategories = await Promise.all(
-        categoryList.map(async (category) => {
-          const courseDetails = await Promise.all(
-            (category.courseIdList || []).map(async (courseId) => {
-              const courseDoc = allCoursesData.find(
-                (course) => course.id === courseId
-              );
-              return courseDoc || null;
-            })
-          );
-          return { ...category, courseDetails: courseDetails.filter(Boolean) };
-        })
-      );
+      const coursesSnapshot = await getDocs(collection(db, "allGPSArtCourses"));
+      const coursesData = coursesSnapshot.docs
+        .map((doc) => ({
+          id: doc.id,
+          courseName: doc.data().courseName,
+          ...doc.data(),
+        }))
+        .sort((a, b) => a.courseName.localeCompare(b.courseName)) as Course[];
 
-      dispatch(setCategories(updatedCategories));
-      filterCourses("All", updatedCategories, allCoursesData);
+      dispatch(setCategories(categoriesData));
+      dispatch(setAllCourses(coursesData));
+      filterCourses("All", categoriesData, coursesData);
     };
 
-    fetchData();
-  }, [dispatch]);
-
-  const filterCourses = (categoryName, allCategories, allCourses) => {
-    let filtered = categoryName === "All" ? allCourses : [];
-    if (categoryName !== "All") {
-      const selectedCat = allCategories.find(
-        (cat) => cat.title === categoryName
-      );
-      if (selectedCat) filtered = selectedCat.courseDetails || [];
-    }
-    filtered = filtered.filter((course) =>
-      course.courseName.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    dispatch(setFilteredCourses(filtered));
-    dispatch(setSelectedCategory(categoryName));
-  };
+    fetchCategoriesAndCourses();
+  }, [filterCourses]);
 
   const handleSearch = () => {
     filterCourses(selectedCategory, categories, allCourses);
@@ -243,7 +233,7 @@ function Dashboard() {
     navigate("/add");
   };
 
-  const handleReadMore = (courseId) => {
+  const handleReadMore = (courseId: string) => {
     navigate(`/details/${courseId}`);
   };
 
@@ -284,7 +274,7 @@ function Dashboard() {
             <SearchInput
               type="text"
               value={searchTerm}
-              onChange={(e) => dispatch(setSearchTerm(e.target.value))}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
             <SearchButton onClick={handleSearch}>Search</SearchButton>
           </SearchContainer>
@@ -312,10 +302,10 @@ function Dashboard() {
         </CourseGrid>
       </Section>
       <div>
-        {isShowing != "" ? <CategoryEditor onClose={setIsShowing} /> : null}
+        {isShowing ? <CategoryEditor onClose={setIsShowing} /> : null}
       </div>
     </DashboardPage>
   );
-}
+};
 
-export default Dashboard;
+export default Dashboard; 
