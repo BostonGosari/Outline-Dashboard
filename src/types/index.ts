@@ -41,6 +41,16 @@ export interface CategoryState {
 
 export interface RootState {
   category: CategoryState;
+  auth: {
+    user: {
+      uid: string;
+      email: string | null;
+      displayName: string | null;
+    } | null;
+    isAuthenticated: boolean;
+    loading: boolean;
+    error: string | null;
+  };
 }
 
 export interface StyledProps {
