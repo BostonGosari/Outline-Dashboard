@@ -3,7 +3,7 @@ import styled from "styled-components";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { collection, getDocs, doc, updateDoc } from "firebase/firestore";
-import { db } from "./index";
+import { db } from "./firebase";
 import { Category, Course, CategoryEditorProps } from "./types";
 
 const Back = styled.div`

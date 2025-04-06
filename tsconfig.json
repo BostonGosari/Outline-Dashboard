@@ -22,7 +22,7 @@
       "@types/*": ["types/*"],
       "@store/*": ["app/store/*"]
     },
-    "types": ["node", "react", "react-dom", "styled-components"],
+    "types": ["jest", "node", "react", "react-dom", "styled-components"],
     "noImplicitAny": true
   },
   "include": ["src"]

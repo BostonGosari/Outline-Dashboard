@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import styled from "styled-components";
 import { useNavigate } from "react-router-dom";
 import { collection, addDoc } from "firebase/firestore";
-import { db } from "./index";
+import { db } from "./firebase";
 import { NewCourseState, HotSpot, LocationInfo } from "./types";
 
 const Section = styled.section`
@@ -85,22 +85,33 @@ const Button = styled.button`
   }
 `;
 
-const initialCourseState: NewCourseState = {
+const initialState: NewCourseState = {
   courseName: "",
   courseLength: 0,
-  courseDuration: 0,
+  courseDuration: "0",
   description: "",
   level: "normal",
   alley: "none",
   regionDisplayName: "",
   producer: "",
   thumbnail: "",
-  locationInfo: {},
+  locationInfo: {
+    center: {
+      longitude: 0,
+      latitude: 0
+    },
+    bounds: {
+      north: 0,
+      south: 0,
+      east: 0,
+      west: 0
+    }
+  },
   hotSpots: [],
 };
 
 const NewCourse: React.FC = () => {
-  const [course, setCourse] = useState<NewCourseState>(initialCourseState);
+  const [course, setCourse] = useState<NewCourseState>(initialState);
   const navigate = useNavigate();
 
   const handleChipChange = (field: keyof NewCourseState, value: string) => {
@@ -145,7 +156,7 @@ const NewCourse: React.FC = () => {
         type="number"
         value={course.courseDuration}
         onChange={(e) =>
-          setCourse({ ...course, courseDuration: Number(e.target.value) })
+          setCourse({ ...course, courseDuration: e.target.value })
         }
       />
 
