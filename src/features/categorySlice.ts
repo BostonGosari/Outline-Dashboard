@@ -5,8 +5,12 @@ const initialState: CategoryState = {
   categories: [],
   allCourses: [],
   filteredCourses: [],
-  selectedCategory: "All",
+  selectedCategory: "",
   searchTerm: "",
+  selectedCourse: null,
+  hotSpots: [],
+  loading: false,
+  error: null
 };
 
 const categorySlice = createSlice({

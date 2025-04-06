@@ -1,16 +1,18 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 interface UIState {
+  isSidebarOpen: boolean;
   isModalOpen: boolean;
   modalType: string | null;
-  isLoading: boolean;
+  loading: boolean;
   error: string | null;
 }
 
 const initialState: UIState = {
+  isSidebarOpen: true,
   isModalOpen: false,
   modalType: null,
-  isLoading: false,
+  loading: false,
   error: null,
 };
 
@@ -18,22 +20,30 @@ const uiSlice = createSlice({
   name: "ui",
   initialState,
   reducers: {
-    openModal(state, action: PayloadAction<string>) {
-      state.isModalOpen = true;
+    setSidebarOpen: (state, action: PayloadAction<boolean>) => {
+      state.isSidebarOpen = action.payload;
+    },
+    setModalOpen: (state, action: PayloadAction<boolean>) => {
+      state.isModalOpen = action.payload;
+    },
+    setModalType: (state, action: PayloadAction<string | null>) => {
       state.modalType = action.payload;
     },
-    closeModal(state) {
-      state.isModalOpen = false;
-      state.modalType = null;
+    setLoading: (state, action: PayloadAction<boolean>) => {
+      state.loading = action.payload;
     },
-    setLoading(state, action: PayloadAction<boolean>) {
-      state.isLoading = action.payload;
-    },
-    setError(state, action: PayloadAction<string | null>) {
+    setError: (state, action: PayloadAction<string | null>) => {
       state.error = action.payload;
     },
   },
 });
 
-export const { openModal, closeModal, setLoading, setError } = uiSlice.actions;
+export const {
+  setSidebarOpen,
+  setModalOpen,
+  setModalType,
+  setLoading,
+  setError,
+} = uiSlice.actions;
+
 export default uiSlice.reducer; 
