@@ -12,8 +12,8 @@ const App: React.FC = () => {
       <Routes>
         <Route path="/" element={<PasswordProtect />} />
         <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/newcourse" element={<NewCourse />} />
-        <Route path="/coursedetail/:id" element={<CourseDetail />} />
+        <Route path="/new-course" element={<NewCourse />} />
+        <Route path="/course/:id" element={<CourseDetail />} />
         <Route
           path="/categoryeditor"
           element={<CategoryEditor onClose={() => {}} />}

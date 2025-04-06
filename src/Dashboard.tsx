@@ -1,52 +1,66 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { collection, getDocs } from "firebase/firestore";
-import { db } from "./index";
+import { db } from "./firebase";
 import {
   setCategories,
   setAllCourses,
   setFilteredCourses,
   setSelectedCategory,
-} from "./features/categorySlice";
+  setSearchTerm,
+} from "./features/courseSlice";
 import styled from "styled-components";
 import { useNavigate } from "react-router-dom";
 import CategoryEditor from "./CategoryEditor";
 import { useAppDispatch, useAppSelector } from "./app/hooks";
-import { Category, Course, StyledProps } from "./types";
+import { Category, Course } from "./types";
 
 const DashboardPage = styled.div`
-  width: 100%;
-  height: 100%;
+  padding: 20px;
   background-color: white;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  min-height: 100vh;
 `;
 
 const Section = styled.section`
-  display: flex;
-  flex-direction: column;
-  max-width: 1000px;
-  width: 100%;
-  padding: 20px;
-  margin: 0px auto;
-
-  @media screen and (max-width: 768px) {
-    padding: 0 5%;
-  }
+  max-width: 1200px;
+  margin: 0 auto;
 `;
 
 const Top = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  flex-direction: row;
+  margin-bottom: 20px;
+
+  h1 {
+    font-size: 24px;
+    margin: 0;
+  }
+`;
+
+const AddCourseButton = styled.button`
+  background-color: black;
+  color: white;
+  border: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 20px;
+  font-size: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    background-color: #333;
+  }
 `;
 
 const TopBar = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 20px;
 `;
 
 const Chips = styled.div`
@@ -54,191 +68,167 @@ const Chips = styled.div`
   gap: 10px;
 `;
 
-const Chip = styled.button<StyledProps>`
-  font-family: "NanumSquare";
-  padding: 5px 10px;
-  font-size: 12px;
-  border: none;
+const Chip = styled.div<{ active?: boolean }>`
+  padding: 5px 15px;
   border-radius: 20px;
-  cursor: pointer;
-  border: solid 1px black;
-  background-color: ${(props) => (props.active ? "black" : "white")};
+  background-color: ${(props) => (props.active ? "black" : "#f0f0f0")};
   color: ${(props) => (props.active ? "white" : "black")};
+  cursor: pointer;
+  transition: all 0.2s;
 
   &:hover {
-    background-color: ${(props) => (props.active ? "#c0c0c0" : "#c0c0c0")};
+    background-color: ${(props) => (props.active ? "black" : "#e0e0e0")};
   }
 `;
 
 const SearchContainer = styled.div`
   display: flex;
-  align-items: center;
+  gap: 10px;
 `;
 
 const SearchInput = styled.input`
-  padding: 7px;
-  font-size: 14px;
-  border: 1px solid black;
-  width: 150px;
-
-  &:focus {
-    outline: none;
-    border-color: #007bff;
-  }
+  padding: 8px 15px;
+  border: 1px solid #ddd;
+  border-radius: 20px;
+  width: 200px;
 `;
 
 const SearchButton = styled.button`
-  padding: 8px 10px;
-  font-size: 14px;
+  padding: 8px 15px;
   border: none;
-  cursor: pointer;
+  border-radius: 20px;
   background-color: black;
   color: white;
+  cursor: pointer;
 
   &:hover {
-    background-color: black;
+    background-color: #333;
   }
 `;
 
-const CourseGrid = styled(motion.div)`
+const CourseGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 0;
-  margin-top: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
 `;
 
 const CourseItem = styled.div`
-  display: flex;
-  flex-direction: column;
-  padding: 15px;
-  border: 1px solid #ccc;
-  background-color: #fff;
-  box-sizing: border-box;
+  background-color: white;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: transform 0.2s;
 
-  &:not(:nth-child(5n + 1)) {
-    border-left: none;
+  &:hover {
+    transform: translateY(-5px);
   }
-
-  &:not(:nth-last-child(-n + 5)) {
-    border-bottom: none;
-  }
-`;
-
-const CourseDetails = styled.div`
-  display: flex;
-  flex-direction: column;
-`;
-
-const CourseTitle = styled.h2`
-  font-size: 16px;
-  margin: 0;
-  font-weight: bold;
-  color: #333;
-`;
-
-const CourseLength = styled.p`
-  font-size: 12px;
-  margin: 5px 0 0 0;
-  color: #555;
 `;
 
 const CourseImage = styled.img`
   width: 100%;
-  height: auto;
-  margin-bottom: 10px;
+  height: 350px;
+  object-fit: cover;
 `;
 
-const AddCourseButton = styled.button`
-  width: 40px;
-  height: 40px;
-  font-size: 30px;
-  font-weight: 200;
-  border: none;
-  border-radius: 50%;
-  cursor: pointer;
-  background-color: black;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+const CourseDetails = styled.div`
+  padding: 15px;
+`;
 
-  &:hover {
-    background-color: #218838;
-  }
+const CourseTitle = styled.h3`
+  margin: 0 0 5px 0;
+  font-size: 18px;
+`;
+
+const CourseLength = styled.p`
+  margin: 0;
+  color: #666;
+  font-size: 14px;
 `;
 
 const Dashboard: React.FC = () => {
-  const dispatch = useAppDispatch();
   const navigate = useNavigate();
-  const {
-    categories,
-    allCourses,
-    filteredCourses,
-    selectedCategory,
-  } = useAppSelector((state) => state.category);
-
-  const [isShowing, setIsShowing] = useState<boolean>(false);
-  const [searchTerm, setSearchTerm] = useState("");
-
-  const filterCourses = useCallback(
-    (categoryName: string, allCategories: Category[], allCourses: Course[]) => {
-      let filtered = categoryName === "All" ? allCourses : [];
-      if (categoryName !== "All") {
-        const selectedCat = allCategories.find(
-          (cat) => cat.title === categoryName
-        );
-        if (selectedCat) {
-          filtered = (selectedCat.courseDetails || []).filter((course): course is Course => course !== null);
-        }
-      }
-      filtered = filtered.filter((course) =>
-        course.courseName.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      dispatch(setFilteredCourses(filtered));
-      dispatch(setSelectedCategory(categoryName));
-    },
-    [dispatch, searchTerm]
-  );
+  const dispatch = useAppDispatch();
+  const [isShowing, setIsShowing] = useState(false);
+  
+  const { 
+    categories, 
+    allCourses, 
+    filteredCourses, 
+    selectedCategory, 
+    searchTerm 
+  } = useAppSelector((state) => state.course);
 
   useEffect(() => {
-    const fetchCategoriesAndCourses = async () => {
-      const categoriesSnapshot = await getDocs(collection(db, "artCategories"));
-      const categoriesData = categoriesSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Category[];
-
-      const coursesSnapshot = await getDocs(collection(db, "allGPSArtCourses"));
-      const coursesData = coursesSnapshot.docs
-        .map((doc) => ({
+    const fetchData = async () => {
+      try {
+        console.log('Fetching data from Firebase...');
+        const categoriesSnapshot = await getDocs(collection(db, 'artCategories'));
+        console.log('Categories snapshot:', categoriesSnapshot.docs.length);
+        const categoriesData = categoriesSnapshot.docs.map(doc => ({
           id: doc.id,
-          courseName: doc.data().courseName,
-          ...doc.data(),
-        }))
-        .sort((a, b) => a.courseName.localeCompare(b.courseName)) as Course[];
+          ...doc.data()
+        })) as Category[];
+        console.log('Processed categories:', categoriesData);
+        dispatch(setCategories(categoriesData));
 
-      dispatch(setCategories(categoriesData));
-      dispatch(setAllCourses(coursesData));
-      filterCourses("All", categoriesData, coursesData);
+        const coursesSnapshot = await getDocs(collection(db, 'allGPSArtCourses'));
+        console.log('Courses snapshot:', coursesSnapshot.docs.length);
+        const coursesData = coursesSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Course[];
+        console.log('Processed courses:', coursesData);
+        dispatch(setAllCourses(coursesData));
+        dispatch(setFilteredCourses(coursesData));
+      } catch (error) {
+        console.error('데이터 가져오기 실패:', error);
+      }
     };
 
-    fetchCategoriesAndCourses();
-  }, [filterCourses]);
+    fetchData();
+  }, [dispatch]);
 
-  const handleSearch = () => {
-    filterCourses(selectedCategory, categories, allCourses);
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    dispatch(setSearchTerm(value));
+    filterCourses(value, selectedCategory);
+  };
+
+  const filterCourses = (search: string, category: string) => {
+    let filtered = [...allCourses];
+
+    if (category && category !== "All") {
+      const categoryObj = categories.find((cat) => cat.id === category);
+      if (categoryObj) {
+        filtered = filtered.filter((course) =>
+          categoryObj.courseIdList.includes(course.id)
+        );
+      }
+    }
+
+    if (search) {
+      filtered = filtered.filter(
+        (course) =>
+          course.courseName.toLowerCase().includes(search.toLowerCase()) ||
+          course.description.toLowerCase().includes(search.toLowerCase())
+      );
+    }
+
+    dispatch(setFilteredCourses(filtered));
+  };
+
+  const handleCategoryClick = (categoryId: string) => {
+    dispatch(setSelectedCategory(categoryId));
+    filterCourses(searchTerm, categoryId);
   };
 
   const handleAddCourse = () => {
-    navigate("/add");
+    navigate('/new-course');
   };
 
-  const handleReadMore = (courseId: string) => {
-    navigate(`/details/${courseId}`);
-  };
-
-  const openModal = () => {
-    setIsShowing(true);
+  const handleCourseClick = (courseId: string) => {
+    navigate(`/course/${courseId}`);
   };
 
   return (
@@ -252,33 +242,32 @@ const Dashboard: React.FC = () => {
         <TopBar>
           <Chips>
             <Chip
-              active={selectedCategory === "All"}
-              onClick={() => filterCourses("All", categories, allCourses)}
+              active={selectedCategory === "All" || selectedCategory === ""}
+              onClick={() => handleCategoryClick("All")}
             >
-              All
+              전체
             </Chip>
             {categories.map((category) => (
               <Chip
                 key={category.id}
-                active={selectedCategory === category.title}
-                onClick={() =>
-                  filterCourses(category.title, categories, allCourses)
-                }
+                active={selectedCategory === category.id}
+                onClick={() => handleCategoryClick(category.id)}
               >
                 {category.title}
               </Chip>
             ))}
-            <Chip onClick={openModal}>⚙️</Chip>
+            <Chip onClick={() => setIsShowing(true)}>⚙️</Chip>
           </Chips>
           <SearchContainer>
             <SearchInput
               type="text"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={handleSearch}
+              placeholder="검색..."
             />
-            <SearchButton onClick={handleSearch}>Search</SearchButton>
           </SearchContainer>
         </TopBar>
+
         <CourseGrid>
           <AnimatePresence mode="wait">
             {filteredCourses.map((course) => (
@@ -289,7 +278,7 @@ const Dashboard: React.FC = () => {
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.5 }}
               >
-                <CourseItem onClick={() => handleReadMore(course.id)}>
+                <CourseItem onClick={() => handleCourseClick(course.id)}>
                   <CourseImage src={course.thumbnail} alt={course.courseName} />
                   <CourseDetails>
                     <CourseTitle>{course.courseName}</CourseTitle>
@@ -301,9 +290,7 @@ const Dashboard: React.FC = () => {
           </AnimatePresence>
         </CourseGrid>
       </Section>
-      <div>
-        {isShowing ? <CategoryEditor onClose={setIsShowing} /> : null}
-      </div>
+      {isShowing && <CategoryEditor onClose={setIsShowing} />}
     </DashboardPage>
   );
 };
