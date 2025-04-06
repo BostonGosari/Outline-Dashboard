@@ -16,7 +16,17 @@ export interface Course {
   regionDisplayName: string;
   producer: string;
   thumbnail: string;
-  locationInfo?: LocationInfo;
+  thumbnailNeon: string;
+  thumbnailLong: string;
+  locationInfo: LocationInfo;
+  distance: number;
+  heading: number;
+  coursePaths: { latitude: number; longitude: number }[];
+  hotSpots: HotSpot[];
+  title: string;
+  centerLocation: { latitude: number; longitude: number };
+  startLocation: { latitude: number; longitude: number };
+  navigation: any[];
 }
 
 export interface HotSpot {
@@ -30,16 +40,14 @@ export interface HotSpot {
 }
 
 export interface LocationInfo {
-  center: {
-    longitude: number;
-    latitude: number;
-  };
-  bounds: {
-    north: number;
-    south: number;
-    east: number;
-    west: number;
-  };
+  name: string;
+  isoCountryCode: string;
+  administrativeArea: string;
+  subAdministrativeArea: string;
+  locality: string;
+  subLocality: string;
+  throughfare: string;
+  subThroughfare: string;
 }
 
 export interface StyledProps {
@@ -88,15 +96,24 @@ export interface RootState {
 export interface NewCourseState {
   courseName: string;
   courseLength: number;
-  courseDuration: string;
+  courseDuration: number;
   description: string;
   level: string;
   alley: string;
   regionDisplayName: string;
   producer: string;
   thumbnail: string;
-  locationInfo?: LocationInfo;
+  thumbnailNeon: string;
+  thumbnailLong: string;
+  locationInfo: LocationInfo;
+  distance: number;
+  heading: number;
+  coursePaths: { latitude: number; longitude: number }[];
   hotSpots: HotSpot[];
+  title: string;
+  centerLocation: { latitude: number; longitude: number };
+  startLocation: { latitude: number; longitude: number };
+  navigation: any[];
 }
 
 export interface CenterLocation {
@@ -110,4 +127,24 @@ export interface CategoryEditorProps {
 
 export interface PasswordProtectProps {
   onLogin?: (value: boolean) => void;
+}
+
+export interface KMLParseResult {
+  coordinates: number[][];
+  bounds: {
+    north: number;
+    south: number;
+    east: number;
+    west: number;
+  };
+  center: {
+    latitude: number;
+    longitude: number;
+  };
+  locationInfo: LocationInfo;
+}
+
+export interface FileUploadResult {
+  url: string;
+  fileName: string;
 } 
