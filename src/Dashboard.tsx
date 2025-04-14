@@ -201,9 +201,9 @@ const Dashboard: React.FC = () => {
     if (category && category !== "All") {
       const categoryObj = categories.find((cat) => cat.id === category);
       if (categoryObj) {
-        filtered = filtered.filter((course) =>
-          categoryObj.courseIdList.includes(course.id)
-        );
+        filtered = categoryObj.courseIdList
+          .map(courseId => filtered.find(course => course.id === courseId))
+          .filter((course): course is Course => course !== undefined);
       }
     }
 

@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { collection, getDocs, doc, updateDoc } from "firebase/firestore";
 import { db } from "./firebase";
 import { Category, Course, CategoryEditorProps } from "./types";
+import cancelImg from "./assets/img/cancel.png";
 
 const Back = styled.div`
   position: fixed;
@@ -76,7 +77,7 @@ const CourseList = styled.div`
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
-  max-width: 600px;
+
 `;
 
 const ActionButtons = styled.div`
@@ -136,26 +137,50 @@ const CategoryEditor: React.FC<CategoryEditorProps> = ({ onClose }) => {
 
   useEffect(() => {
     const fetchCategoriesAndCourses = async () => {
-      const categoriesSnapshot = await getDocs(collection(db, "artCategories"));
-      const categoriesData = categoriesSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Category[];
+      try {
+        // 코스 데이터 먼저 가져오기
+        const coursesSnapshot = await getDocs(collection(db, "allGPSArtCourses"));
+        const coursesData = coursesSnapshot.docs
+          .map((doc) => ({
+            id: doc.id,
+            courseName: doc.data().courseName as string,
+            ...doc.data(),
+          }))
+          .sort((a, b) => a.courseName.localeCompare(b.courseName)) as Course[];
+        setAllCourses(coursesData);
 
-      setCategories(categoriesData);
-      if (categoriesData.length > 0) {
-        handleCategorySelect(categoriesData[0]);
-      }
-
-      const coursesSnapshot = await getDocs(collection(db, "allGPSArtCourses"));
-      const coursesData = coursesSnapshot.docs
-        .map((doc) => ({
+        // 카테고리 데이터 가져오기
+        const categoriesSnapshot = await getDocs(collection(db, "artCategories"));
+        const categoriesData = categoriesSnapshot.docs.map((doc) => ({
           id: doc.id,
-          courseName: doc.data().courseName as string,
           ...doc.data(),
-        }))
-        .sort((a, b) => a.courseName.localeCompare(b.courseName)) as Course[];
-      setAllCourses(coursesData);
+        })) as Category[];
+
+        setCategories(categoriesData);
+        
+        // 첫 번째 카테고리가 있다면 선택
+        if (categoriesData.length > 0) {
+          const firstCategory = categoriesData[0];
+          setSelectedCategory(firstCategory);
+          
+          // 선택된 코스 설정
+          const courseList = firstCategory.courseIdList || [];
+          const validCourses = courseList.filter(courseId => 
+            coursesData.some(course => course.id === courseId)
+          );
+          
+          setSelectedCourses(validCourses);
+          
+          // 순서 설정
+          const newOrder: { [key: string]: number } = {};
+          validCourses.forEach((courseId, index) => {
+            newOrder[courseId] = index + 1;
+          });
+          setCourseOrder(newOrder);
+        }
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      }
     };
 
     fetchCategoriesAndCourses();
@@ -163,39 +188,54 @@ const CategoryEditor: React.FC<CategoryEditorProps> = ({ onClose }) => {
 
   const handleCategorySelect = (category: Category) => {
     setSelectedCategory(category);
-    setSelectedCourses(category.courseIdList || []);
-    const initialOrder: { [key: string]: number } = {};
-    category.courseIdList.forEach((courseId, index) => {
-      initialOrder[courseId] = index + 1;
+    
+    // 현재 저장된 courseIdList를 가져오거나 빈 배열 사용
+    const existingCourses = category.courseIdList || [];
+    
+    // 중복 제거 및 실제 존재하는 코스 확인
+    const uniqueCourses = Array.from(new Set(existingCourses));
+    const validCourses = uniqueCourses.filter(courseId => 
+      allCourses.some(course => course.id === courseId)
+    );
+
+    setSelectedCourses(validCourses);
+    
+    // 순서를 1부터 순차적으로 다시 설정
+    const newOrder: { [key: string]: number } = {};
+    validCourses.forEach((courseId, index) => {
+      newOrder[courseId] = index + 1;
     });
-    setCourseOrder(initialOrder);
+    setCourseOrder(newOrder);
   };
 
   const handleCourseToggle = (course: Course) => {
+    let newSelectedCourses: string[];
+    
     if (selectedCourses.includes(course.id)) {
-      setSelectedCourses(selectedCourses.filter((id) => id !== course.id));
-      const newOrder = { ...courseOrder };
-      delete newOrder[course.id];
-      setCourseOrder(newOrder);
+      // 코스 제거
+      newSelectedCourses = selectedCourses.filter((id) => id !== course.id);
     } else {
-      setSelectedCourses([...selectedCourses, course.id]);
-      setCourseOrder({
-        ...courseOrder,
-        [course.id]: Object.keys(courseOrder).length + 1,
-      });
+      // 코스 추가
+      newSelectedCourses = [...selectedCourses, course.id];
     }
+
+    // 순서를 1부터 순차적으로 다시 설정
+    const newOrder: { [key: string]: number } = {};
+    newSelectedCourses.forEach((courseId, index) => {
+      newOrder[courseId] = index + 1;
+    });
+
+    setSelectedCourses(newSelectedCourses);
+    setCourseOrder(newOrder);
   };
 
   const saveCategory = async () => {
     if (!selectedCategory) return;
 
-    const orderedCourseIds = Object.entries(courseOrder)
-      .sort(([, a], [, b]) => a - b)
-      .map(([id]) => id);
-
+    // 현재 선택된 코스 목록을 그대로 저장
     const updatedCategory = {
       ...selectedCategory,
-      courseIdList: orderedCourseIds,
+      courseIdList: selectedCourses,
     };
 
     try {
@@ -239,7 +279,7 @@ const CategoryEditor: React.FC<CategoryEditorProps> = ({ onClose }) => {
     <Back>
       <CategoryEditorContainer>
         <CancelButton
-          src="/cancel.png"
+          src={cancelImg}
           onClick={() => {
             onClose(false);
           }}
