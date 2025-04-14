@@ -96,12 +96,42 @@ const SaveButton = styled.button`
   color: white;
 `;
 
+const EditIcon = styled.svg`
+  width: 12px;
+  height: 12px;
+  margin-left: 6px;
+  cursor: pointer;
+  fill: currentColor;
+`;
+
+const ChipContent = styled.div`
+  display: flex;
+  align-items: center;
+  min-width: fit-content;
+`;
+
+const EditInput = styled.input.attrs<{ value: string }>(props => ({
+  style: {
+    width: `${props.value.length * 10}px`
+  }
+}))`
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  min-width: 50px;
+  color: inherit;
+  outline: none;
+  padding: 0;
+`;
+
 const CategoryEditor: React.FC<CategoryEditorProps> = ({ onClose }) => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
   const [allCourses, setAllCourses] = useState<Course[]>([]);
   const [courseOrder, setCourseOrder] = useState<{ [key: string]: number }>({});
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -176,6 +206,35 @@ const CategoryEditor: React.FC<CategoryEditorProps> = ({ onClose }) => {
     }
   };
 
+  const handleEditClick = (e: React.MouseEvent, category: Category) => {
+    e.stopPropagation();
+    setEditingCategoryId(category.id);
+    setEditingTitle(category.title);
+  };
+
+  const handleTitleChange = async (categoryId: string) => {
+    if (!editingTitle.trim()) return;
+
+    try {
+      await updateDoc(doc(db, "artCategories", categoryId), {
+        title: editingTitle.trim()
+      });
+
+      setCategories(categories.map(cat => 
+        cat.id === categoryId ? { ...cat, title: editingTitle.trim() } : cat
+      ));
+      setEditingCategoryId(null);
+    } catch (error) {
+      console.error("Error updating category title: ", error);
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent, categoryId: string) => {
+    if (e.key === 'Enter') {
+      handleTitleChange(categoryId);
+    }
+  };
+
   return createPortal(
     <Back>
       <CategoryEditorContainer>
@@ -194,7 +253,28 @@ const CategoryEditor: React.FC<CategoryEditorProps> = ({ onClose }) => {
               active={selectedCategory?.id === category.id}
               onClick={() => handleCategorySelect(category)}
             >
-              {category.title}
+              <ChipContent>
+                {editingCategoryId === category.id ? (
+                  <EditInput
+                    value={editingTitle}
+                    onChange={(e) => setEditingTitle(e.target.value)}
+                    onBlur={() => handleTitleChange(category.id)}
+                    onKeyPress={(e) => handleKeyPress(e, category.id)}
+                    autoFocus
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                ) : (
+                  <>
+                    {category.title}
+                    <EditIcon
+                      viewBox="0 0 24 24"
+                      onClick={(e) => handleEditClick(e, category)}
+                    >
+                      <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                    </EditIcon>
+                  </>
+                )}
+              </ChipContent>
             </Chip>
           ))}
         </CategoryList>
