@@ -11,22 +11,29 @@ export interface Course {
   courseLength: number;
   courseDuration: number;
   description: string;
-  level: string;
-  alley: string;
+  title: string;
+  centerLocation: { latitude: number; longitude: number };
+  startLocation: { latitude: number; longitude: number };
+  navigation: any[];
   regionDisplayName: string;
   producer: string;
   thumbnail: string;
   thumbnailNeon: string;
   thumbnailLong: string;
-  locationInfo: LocationInfo;
   distance: number;
   heading: number;
   coursePaths: { latitude: number; longitude: number }[];
+  locationInfo: LocationInfo;
+  level: string;
+  alley: string;
   hotSpots: HotSpot[];
-  title: string;
-  centerLocation: { latitude: number; longitude: number };
-  startLocation: { latitude: number; longitude: number };
-  navigation: any[];
+  elevation?: number;
+  difficulty?: string;
+  estimatedTime?: number;
+  startPoint?: string;
+  endPoint?: string;
+  terrain?: string;
+  bestSeason?: string;
 }
 
 export interface HotSpot {

@@ -194,14 +194,14 @@ const CourseDetail = () => {
     },
     level: "easy",
     alley: "none",
-    hotSpots: [
-      {
-        id: "",
-        title: "",
-        spotDescription: "",
-        location: { longitude: 0, latitude: 0 },
-      },
-    ],
+    hotSpots: [],
+    elevation: 0,
+    difficulty: "초급",
+    estimatedTime: 0,
+    startPoint: "",
+    endPoint: "",
+    terrain: "",
+    bestSeason: ""
   });
 
   useEffect(() => {
