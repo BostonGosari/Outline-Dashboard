@@ -6,7 +6,7 @@ import { db } from "./firebase";
 import axios from "axios";
 import styled from "styled-components";
 import { Course, LocationInfo } from "./types";
-import { parseKMLFile } from "./utils/kmlParser";
+import CourseFileUpload from "./components/CourseFileUpload";
 
 const Section = styled.section`
   display: flex;
@@ -118,47 +118,7 @@ interface AddressComponent {
   types: string[];
 }
 
-async function reverseGeocode(coordinate: Coordinate): Promise<LocationInfo | null> {
-  const apiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
-  const { latitude, longitude } = coordinate;
-  const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${apiKey}`;
 
-  try {
-    const response = await axios.get(url);
-    if (response.data.results.length > 0) {
-      const address = response.data.results[0].address_components as AddressComponent[];
-      return {
-        name: response.data.results[0].formatted_address,
-        isoCountryCode:
-          address.find((comp) => comp.types.includes("country"))?.short_name ||
-          "",
-        administrativeArea:
-          address.find((comp) =>
-            comp.types.includes("administrative_area_level_1")
-          )?.long_name || "",
-        subAdministrativeArea:
-          address.find((comp) =>
-            comp.types.includes("administrative_area_level_2")
-          )?.long_name || "",
-        locality:
-          address.find((comp) => comp.types.includes("locality"))?.long_name ||
-          "",
-        subLocality:
-          address.find((comp) => comp.types.includes("sublocality"))
-            ?.long_name || "",
-        throughfare:
-          address.find((comp) => comp.types.includes("route"))?.long_name || "",
-        subThroughfare:
-          address.find((comp) => comp.types.includes("street_number"))
-            ?.long_name || "",
-      };
-    }
-  } catch (error) {
-    console.error("Error in reverse geocoding:", error);
-  }
-
-  return null;
-}
 
 const CourseDetail = () => {
   const { id } = useParams();
@@ -218,33 +178,19 @@ const CourseDetail = () => {
     fetchCourse();
   }, [id]);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && file.name.endsWith(".kml")) {
-      try {
-        const result = await parseKMLFile(file);
-        
-        // 좌표 형식 변환
-        const convertedPaths = result.coordinates.map(([longitude, latitude]) => ({
-          latitude,
-          longitude
-        }));
-        
-        // 시작 위치와 중심 위치 설정
-        const startLocation = convertedPaths.length > 0 ? convertedPaths[0] : { latitude: 0, longitude: 0 };
-        const centerLocation = result.center;
-        
-        setCourse((prevCourse) => ({
-          ...prevCourse,
-          coursePaths: convertedPaths,
-          locationInfo: result.locationInfo,
-          startLocation,
-          centerLocation,
-        }));
-      } catch (error) {
-        console.error("Error parsing KML or fetching location info:", error);
-      }
-    }
+  const handleFileProcessed = (data: {
+    coordinates: { latitude: number; longitude: number }[];
+    locationInfo: LocationInfo;
+    startLocation: { latitude: number; longitude: number };
+    centerLocation: { latitude: number; longitude: number };
+  }) => {
+    setCourse((prevCourse) => ({
+      ...prevCourse,
+      coursePaths: data.coordinates,
+      locationInfo: data.locationInfo,
+      startLocation: data.startLocation,
+      centerLocation: data.centerLocation,
+    }));
   };
 
   const handleThumbnailUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: keyof Pick<Course, "thumbnail" | "thumbnailNeon" | "thumbnailLong">) => {
@@ -498,8 +444,7 @@ const CourseDetail = () => {
         </ThumbnailGroup>
       </ThumbnailContainer>
 
-      <Label>Course Paths (Upload XML)</Label>
-      <FileInput type="file" onChange={handleFileUpload} accept=".kml" />
+      <CourseFileUpload onFileProcessed={handleFileProcessed} />
 
       <Label>Hot Spots</Label>
       {course.hotSpots?.map((spot, index) => (

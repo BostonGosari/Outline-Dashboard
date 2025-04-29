@@ -151,6 +151,21 @@ export interface KMLParseResult {
   locationInfo: LocationInfo;
 }
 
+export interface GPXParseResult {
+  coordinates: number[][];
+  bounds: {
+    north: number;
+    south: number;
+    east: number;
+    west: number;
+  };
+  center: {
+    latitude: number;
+    longitude: number;
+  };
+  locationInfo: LocationInfo;
+}
+
 export interface FileUploadResult {
   url: string;
   fileName: string;

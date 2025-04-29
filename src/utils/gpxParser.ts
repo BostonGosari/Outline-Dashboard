@@ -1,14 +1,14 @@
-import { KMLParseResult } from "../types/index";
+import { GPXParseResult } from "../types/index";
 import { getLocationInfo } from "./geocoding";
 
-export const parseKMLFile = (file: File): Promise<KMLParseResult> => {
+export const parseGPXFile = (file: File): Promise<GPXParseResult> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
         const parser = new DOMParser();
-        const kml = parser.parseFromString(e.target?.result as string, "text/xml");
-        const coordinates = extractCoordinates(kml);
+        const gpx = parser.parseFromString(e.target?.result as string, "text/xml");
+        const coordinates = extractCoordinates(gpx);
         const bounds = calculateBounds(coordinates);
         const center = calculateCenter(bounds);
         
@@ -31,21 +31,14 @@ export const parseKMLFile = (file: File): Promise<KMLParseResult> => {
   });
 };
 
-const extractCoordinates = (kml: Document): number[][] => {
+const extractCoordinates = (gpx: Document): number[][] => {
   const coordinates: number[][] = [];
-  const coordinatesElements = kml.getElementsByTagName("coordinates");
+  const trackPoints = gpx.getElementsByTagName("trkpt");
   
-  for (let i = 0; i < coordinatesElements.length; i++) {
-    const coordText = coordinatesElements[i].textContent;
-    if (coordText) {
-      const points = coordText.trim().split(/\s+/);
-      points.forEach(point => {
-        const [lon, lat] = point.split(",").map(Number);
-        if (!isNaN(lon) && !isNaN(lat)) {
-          coordinates.push([lon, lat]);
-        }
-      });
-    }
+  for (let i = 0; i < trackPoints.length; i++) {
+    const lat = parseFloat(trackPoints[i].getAttribute("lat") || "0");
+    const lon = parseFloat(trackPoints[i].getAttribute("lon") || "0");
+    coordinates.push([lon, lat]);
   }
   
   return coordinates;
