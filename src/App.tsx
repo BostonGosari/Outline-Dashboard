@@ -1,9 +1,8 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Dashboard from "./Dashboard";
-import NewCourse from "./NewCourse";
+import CourseForm from "./CourseForm";
 import PasswordProtect from "./PasswordProtect";
-import CourseDetail from "./CourseDetail";
 import CategoryEditor from "./CategoryEditor";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -23,10 +22,10 @@ const App: React.FC = () => {
             }
           />
           <Route
-            path="/new-course"
+            path="/course/new"
             element={
               <ProtectedRoute>
-                <NewCourse />
+                <CourseForm />
               </ProtectedRoute>
             }
           />
@@ -34,7 +33,7 @@ const App: React.FC = () => {
             path="/course/:id"
             element={
               <ProtectedRoute>
-                <CourseDetail />
+                <CourseForm />
               </ProtectedRoute>
             }
           />

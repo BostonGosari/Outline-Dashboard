@@ -27,13 +27,6 @@ export interface Course {
   level: string;
   alley: string;
   hotSpots: HotSpot[];
-  elevation?: number;
-  difficulty?: string;
-  estimatedTime?: number;
-  startPoint?: string;
-  endPoint?: string;
-  terrain?: string;
-  bestSeason?: string;
 }
 
 export interface HotSpot {

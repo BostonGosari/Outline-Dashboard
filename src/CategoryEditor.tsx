@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from "react";
 import styled from "styled-components";
 import { createPortal } from "react-dom";
-import { useNavigate } from "react-router-dom";
-import { collection, getDocs, doc, updateDoc } from "firebase/firestore";
-import { db } from "./firebase";
 import { Category, Course, CategoryEditorProps } from "./types";
+import { fetchCategoriesAndCourses, updateCategory } from "./services/firebase";
 import cancelImg from "./assets/img/cancel.png";
 
 const Back = styled.div`
@@ -133,40 +131,23 @@ const CategoryEditor: React.FC<CategoryEditorProps> = ({ onClose }) => {
   const [courseOrder, setCourseOrder] = useState<{ [key: string]: number }>({});
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
-  const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchCategoriesAndCourses = async () => {
+    const loadData = async () => {
       try {
-        // 코스 데이터 먼저 가져오기
-        const coursesSnapshot = await getDocs(collection(db, "allGPSArtCourses"));
-        const coursesData = coursesSnapshot.docs
-          .map((doc) => ({
-            id: doc.id,
-            courseName: doc.data().courseName as string,
-            ...doc.data(),
-          }))
-          .sort((a, b) => a.courseName.localeCompare(b.courseName)) as Course[];
-        setAllCourses(coursesData);
-
-        // 카테고리 데이터 가져오기
-        const categoriesSnapshot = await getDocs(collection(db, "artCategories"));
-        const categoriesData = categoriesSnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Category[];
-
-        setCategories(categoriesData);
+        const { courses, categories } = await fetchCategoriesAndCourses();
+        setAllCourses(courses);
+        setCategories(categories);
         
         // 첫 번째 카테고리가 있다면 선택
-        if (categoriesData.length > 0) {
-          const firstCategory = categoriesData[0];
+        if (categories.length > 0) {
+          const firstCategory = categories[0];
           setSelectedCategory(firstCategory);
           
           // 선택된 코스 설정
           const courseList = firstCategory.courseIdList || [];
           const validCourses = courseList.filter(courseId => 
-            coursesData.some(course => course.id === courseId)
+            courses.some(course => course.id === courseId)
           );
           
           setSelectedCourses(validCourses);
@@ -179,11 +160,11 @@ const CategoryEditor: React.FC<CategoryEditorProps> = ({ onClose }) => {
           setCourseOrder(newOrder);
         }
       } catch (error) {
-        console.error("Error fetching data:", error);
+        console.error("Error loading data:", error);
       }
     };
 
-    fetchCategoriesAndCourses();
+    loadData();
   }, []);
 
   const handleCategorySelect = (category: Category) => {
@@ -232,14 +213,11 @@ const CategoryEditor: React.FC<CategoryEditorProps> = ({ onClose }) => {
   const saveCategory = async () => {
     if (!selectedCategory) return;
 
-    // 현재 선택된 코스 목록을 그대로 저장
-    const updatedCategory = {
-      ...selectedCategory,
-      courseIdList: selectedCourses,
-    };
-
     try {
-      await updateDoc(doc(db, "artCategories", selectedCategory.id), updatedCategory);
+      await updateCategory(selectedCategory.id, {
+        ...selectedCategory,
+        courseIdList: selectedCourses,
+      });
       onClose(false);
     } catch (error) {
       console.error("Error updating category: ", error);
@@ -256,7 +234,7 @@ const CategoryEditor: React.FC<CategoryEditorProps> = ({ onClose }) => {
     if (!editingTitle.trim()) return;
 
     try {
-      await updateDoc(doc(db, "artCategories", categoryId), {
+      await updateCategory(categoryId, {
         title: editingTitle.trim()
       });
 

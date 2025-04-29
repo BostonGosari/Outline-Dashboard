@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { db } from "./firebase";
-import axios from "axios";
 import styled from "styled-components";
+import { useParams, useNavigate } from "react-router-dom";
+import { doc, getDoc, updateDoc, addDoc, collection } from "firebase/firestore";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { db } from "./services/firebase";
 import { Course, LocationInfo } from "./types";
 import CourseFileUpload from "./components/CourseFileUpload";
+
+interface ChipProps {
+  active: boolean;
+}
 
 const Section = styled.section`
   display: flex;
@@ -72,10 +75,6 @@ const ChipContainer = styled.div`
   margin-top: 10px;
 `;
 
-interface ChipProps {
-  active: boolean;
-}
-
 const Chip = styled.button<ChipProps>`
   padding: 10px;
   font-size: 14px;
@@ -107,62 +106,45 @@ const Button = styled.button`
   }
 `;
 
-interface Coordinate {
-  latitude: number;
-  longitude: number;
-}
+const initialState: Course = {
+  id: "",
+  courseName: "",
+  courseLength: 0,
+  courseDuration: 0,
+  description: "",
+  title: "없어져야할 필드",
+  centerLocation: { latitude: 0, longitude: 0 },
+  startLocation: { latitude: 0, longitude: 0 },
+  navigation: [],
+  regionDisplayName: "",
+  producer: "",
+  thumbnail: "",
+  thumbnailNeon: "",
+  thumbnailLong: "",
+  distance: 0,
+  heading: 0,
+  coursePaths: [],
+  locationInfo: {
+    name: "",
+    isoCountryCode: "",
+    administrativeArea: "",
+    subAdministrativeArea: "",
+    locality: "",
+    subLocality: "",
+    throughfare: "",
+    subThroughfare: "",
+  },
+  level: "easy",
+  alley: "none",
+  hotSpots: [],
+};
 
-interface AddressComponent {
-  short_name: string;
-  long_name: string;
-  types: string[];
-}
-
-
-
-const CourseDetail = () => {
+const CourseForm: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const storage = getStorage();
-  const [course, setCourse] = useState<Course>({
-    id: "",
-    courseName: "",
-    courseLength: 0,
-    courseDuration: 0,
-    description: "",
-    title: "",
-    centerLocation: { latitude: 0, longitude: 0 },
-    startLocation: { latitude: 0, longitude: 0 },
-    navigation: [],
-    regionDisplayName: "",
-    producer: "",
-    thumbnail: "",
-    thumbnailNeon: "",
-    thumbnailLong: "",
-    distance: 0,
-    heading: 0,
-    coursePaths: [],
-    locationInfo: {
-      name: "",
-      isoCountryCode: "",
-      administrativeArea: "",
-      subAdministrativeArea: "",
-      locality: "",
-      subLocality: "",
-      throughfare: "",
-      subThroughfare: "",
-    },
-    level: "easy",
-    alley: "none",
-    hotSpots: [],
-    elevation: 0,
-    difficulty: "초급",
-    estimatedTime: 0,
-    startPoint: "",
-    endPoint: "",
-    terrain: "",
-    bestSeason: ""
-  });
+  const [course, setCourse] = useState<Course>(initialState);
+  const isEditMode = !!id;
 
   useEffect(() => {
     const fetchCourse = async () => {
@@ -236,13 +218,7 @@ const CourseDetail = () => {
     }));
   };
 
-  const handleUpdate = async () => {
-    if (!id) {
-      console.error("Course ID is missing");
-      alert("코스 ID가 없습니다. 다시 시도해주세요.");
-      return;
-    }
-
+  const handleSubmit = async () => {
     try {
       const finalHotSpots = course.hotSpots.every(
         (spot) =>
@@ -260,43 +236,41 @@ const CourseDetail = () => {
         hotSpots: finalHotSpots,
       };
 
-      console.log("Updating course with data:", courseData);
-      await updateDoc(doc(db, "allGPSArtCourses", id), courseData);
-      console.log("Course updated successfully");
-      alert("코스가 성공적으로 업데이트되었습니다.");
+      if (isEditMode) {
+        await updateDoc(doc(db, "allGPSArtCourses", id), courseData);
+        console.log("Course updated successfully");
+      } else {
+        const docRef = await addDoc(collection(db, "allGPSArtCourses"), courseData);
+        await updateDoc(doc(db, "allGPSArtCourses", docRef.id), { id: docRef.id });
+        console.log("Course added successfully");
+      }
+      
+      alert(isEditMode ? "코스가 성공적으로 업데이트되었습니다." : "코스가 성공적으로 추가되었습니다.");
       navigate("/dashboard");
     } catch (error) {
-      console.error("Error updating course:", error);
-      alert("코스 업데이트 중 오류가 발생했습니다: " + (error instanceof Error ? error.message : String(error)));
+      console.error("Error saving course:", error);
+      alert("코스 저장 중 오류가 발생했습니다: " + (error instanceof Error ? error.message : String(error)));
     }
   };
 
   return (
     <Section>
-      <h1>Edit Course</h1>
-
-      <Label>Course Title</Label>
-      <Input
-        type="text"
-        value={course.title}
-        onChange={(e) => setCourse({ ...course, title: e.target.value })}
-      />
-
-      <Label>Course Name</Label>
+      <h1>{isEditMode ? "코스 수정" : "새 코스 추가"}</h1>
+      <Label>코스 이름</Label>
       <Input
         type="text"
         value={course.courseName}
         onChange={(e) => setCourse({ ...course, courseName: e.target.value })}
       />
 
-      <Label>Course Length (km)</Label>
+      <Label>코스 길이 (km)</Label>
       <Input
         type="number"
         value={course.courseLength}
         onChange={(e) => setCourse({ ...course, courseLength: Number(e.target.value) })}
       />
 
-      <Label>Course Duration (minutes)</Label>
+      <Label>소요 시간 (분)</Label>
       <Input
         type="number"
         value={course.courseDuration}
@@ -305,91 +279,91 @@ const CourseDetail = () => {
         }
       />
 
-      <Label>Course Description</Label>
+      <Label>코스 설명</Label>
       <TextArea
         value={course.description}
         onChange={(e) => setCourse({ ...course, description: e.target.value })}
       />
 
-      <Label>Course Level</Label>
+      <Label>난이도</Label>
       <ChipContainer>
         <Chip
           active={course.level === "easy"}
           onClick={() => handleChipChange("level", "easy")}
         >
-          Easy
+          쉬움
         </Chip>
         <Chip
           active={course.level === "normal"}
           onClick={() => handleChipChange("level", "normal")}
         >
-          Normal
+          보통
         </Chip>
         <Chip
           active={course.level === "hard"}
           onClick={() => handleChipChange("level", "hard")}
         >
-          Hard
+          어려움
         </Chip>
       </ChipContainer>
 
-      <Label>Alley Type</Label>
+      <Label>골목 유형</Label>
       <ChipContainer>
         <Chip
           active={course.alley === "none"}
           onClick={() => handleChipChange("alley", "none")}
         >
-          None
+          없음
         </Chip>
         <Chip
           active={course.alley === "few"}
           onClick={() => handleChipChange("alley", "few")}
         >
-          Few
+          적음
         </Chip>
         <Chip
           active={course.alley === "lots"}
           onClick={() => handleChipChange("alley", "lots")}
         >
-          Lots
+          많음
         </Chip>
       </ChipContainer>
 
-      <Label>Location Information</Label>
+      <Label>지역 정보</Label>
       <div>
         <p>
-          <strong>Name:</strong> {course.locationInfo?.name || "N/A"}
+          <strong>이름:</strong> {course.locationInfo?.name || "N/A"}
         </p>
         <p>
-          <strong>ISO Country Code:</strong>{" "}
+          <strong>국가 코드:</strong>{" "}
           {course.locationInfo?.isoCountryCode || "N/A"}
         </p>
         <p>
-          <strong>Administrative Area:</strong>{" "}
+          <strong>행정 구역:</strong>{" "}
           {course.locationInfo?.administrativeArea || "N/A"}
         </p>
         <p>
-          <strong>Sub-Administrative Area:</strong>{" "}
+          <strong>하위 행정 구역:</strong>{" "}
           {course.locationInfo?.subAdministrativeArea || "N/A"}
         </p>
         <p>
-          <strong>Locality:</strong> {course.locationInfo?.locality || "N/A"}
+          <strong>지역:</strong> {course.locationInfo?.locality || "N/A"}
         </p>
         <p>
-          <strong>Sub-Locality:</strong>{" "}
+          <strong>하위 지역:</strong>{" "}
           {course.locationInfo?.subLocality || "N/A"}
         </p>
         <p>
-          <strong>Throughfare:</strong>{" "}
+          <strong>도로:</strong>{" "}
           {course.locationInfo?.throughfare || "N/A"}
         </p>
         <p>
-          <strong>Sub-Throughfare:</strong>{" "}
+          <strong>하위 도로:</strong>{" "}
           {course.locationInfo?.subThroughfare || "N/A"}
         </p>
       </div>
 
-      <Label>Region Display Name</Label>
+      <Label>지역 표시 이름</Label>
       <Input
         type="text"
         value={course.regionDisplayName}
@@ -398,58 +372,58 @@ const CourseDetail = () => {
         }
       />
 
-      <Label>Producer</Label>
+      <Label>제작자</Label>
       <Input
         type="text"
         value={course.producer}
         onChange={(e) => setCourse({ ...course, producer: e.target.value })}
       />
 
-      <Label>Thumbnails</Label>
+      <Label>썸네일</Label>
       <ThumbnailContainer>
         <ThumbnailGroup>
-          <Label>Main</Label>
+          <Label>메인</Label>
           <FileInput
             type="file"
             onChange={(e) => handleThumbnailUpload(e, "thumbnail")}
             accept="image/*"
           />
           {course.thumbnail && (
-            <ThumbnailPreview src={course.thumbnail} alt="Main Thumbnail" />
+            <ThumbnailPreview src={course.thumbnail} alt="메인 썸네일" />
           )}
         </ThumbnailGroup>
 
         <ThumbnailGroup>
-          <Label>Neon</Label>
+          <Label>네온</Label>
           <FileInput
             type="file"
             onChange={(e) => handleThumbnailUpload(e, "thumbnailNeon")}
             accept="image/*"
           />
           {course.thumbnailNeon && (
-            <ThumbnailPreview src={course.thumbnailNeon} alt="Neon Thumbnail" />
+            <ThumbnailPreview src={course.thumbnailNeon} alt="네온 썸네일" />
           )}
         </ThumbnailGroup>
 
         <ThumbnailGroup>
-          <Label>Long</Label>
+          <Label>롱</Label>
           <FileInput
             type="file"
             onChange={(e) => handleThumbnailUpload(e, "thumbnailLong")}
             accept="image/*"
           />
           {course.thumbnailLong && (
-            <ThumbnailPreview src={course.thumbnailLong} alt="Long Thumbnail" />
+            <ThumbnailPreview src={course.thumbnailLong} alt="롱 썸네일" />
           )}
         </ThumbnailGroup>
       </ThumbnailContainer>
 
       <CourseFileUpload onFileProcessed={handleFileProcessed} />
 
-      <Label>Hot Spots</Label>
+      <Label>핫스팟</Label>
       {course.hotSpots?.map((spot, index) => (
         <div key={index}>
-          <Label>Title</Label>
+          <Label>제목</Label>
           <Input
             type="text"
             value={spot.title}
@@ -460,7 +434,7 @@ const CourseDetail = () => {
             }}
           />
 
-          <Label>Description</Label>
+          <Label>설명</Label>
           <TextArea
             value={spot.spotDescription}
             onChange={(e) => {
@@ -470,7 +444,7 @@ const CourseDetail = () => {
             }}
           />
 
-          <Label>Location (Longitude, Latitude)</Label>
+          <Label>위치 (경도, 위도)</Label>
           <Input
             type="text"
             value={`${spot.location.longitude}, ${spot.location.latitude}`}
@@ -486,10 +460,10 @@ const CourseDetail = () => {
         </div>
       ))}
 
-      <Button onClick={addHotSpot}>Add Another Hot Spot</Button>
-      <Button onClick={handleUpdate}>Update Course</Button>
+      <Button onClick={addHotSpot}>핫스팟 추가</Button>
+      <Button onClick={handleSubmit}>{isEditMode ? "코스 수정" : "코스 추가"}</Button>
     </Section>
   );
 };
 
-export default CourseDetail; 
+export default CourseForm; 

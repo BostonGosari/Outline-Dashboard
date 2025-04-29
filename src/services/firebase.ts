@@ -1,4 +1,6 @@
+import { initializeApp } from 'firebase/app';
 import { 
+  getFirestore,
   collection, 
   doc, 
   getDocs, 
@@ -9,8 +11,32 @@ import {
   query, 
   where 
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { getAuth } from 'firebase/auth';
+import { getStorage } from 'firebase/storage';
 import { Course, Category, HotSpot } from '../types';
+
+// Firebase 초기화
+const firebaseConfig = {
+  apiKey: process.env.REACT_APP_FIREBASE_API_KEY as string,
+  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN as string,
+  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID as string,
+  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET as string,
+  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID as string,
+  appId: process.env.REACT_APP_FIREBASE_APP_ID as string
+};
+
+console.log('Firebase Config:', {
+  ...firebaseConfig,
+  apiKey: firebaseConfig.apiKey ? '***' : undefined,
+  appId: firebaseConfig.appId ? '***' : undefined
+});
+
+const app = initializeApp(firebaseConfig);
+export const db = getFirestore(app);
+export const auth = getAuth(app);
+export const storage = getStorage(app);
+
+console.log('Firebase initialized successfully');
 
 // 카테고리 관련 API
 export const getCategories = async (): Promise<Category[]> => {
@@ -117,7 +143,6 @@ export const deleteCourse = async (id: string): Promise<void> => {
   }
 };
 
-// 핫스팟 관련 API
 export const getHotSpots = async (courseId: string): Promise<HotSpot[]> => {
   try {
     const q = query(collection(db, 'hotSpots'), where('courseId', '==', courseId));
@@ -161,6 +186,36 @@ export const deleteHotSpot = async (id: string): Promise<void> => {
     await deleteDoc(docRef);
   } catch (error) {
     console.error('핫스팟 삭제 실패:', error);
+    throw error;
+  }
+};
+
+// 카테고리와 코스 데이터 가져오기
+export const fetchCategoriesAndCourses = async () => {
+  try {
+    // 코스 데이터 먼저 가져오기
+    const coursesSnapshot = await getDocs(collection(db, "allGPSArtCourses"));
+    const coursesData = coursesSnapshot.docs
+      .map((doc) => ({
+        id: doc.id,
+        courseName: doc.data().courseName as string,
+        ...doc.data(),
+      }))
+      .sort((a, b) => a.courseName.localeCompare(b.courseName)) as Course[];
+
+    // 카테고리 데이터 가져오기
+    const categoriesSnapshot = await getDocs(collection(db, "artCategories"));
+    const categoriesData = categoriesSnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Category[];
+
+    return {
+      courses: coursesData,
+      categories: categoriesData
+    };
+  } catch (error) {
+    console.error("Error fetching data:", error);
     throw error;
   }
 }; 

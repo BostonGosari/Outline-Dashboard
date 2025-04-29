@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { collection, getDocs } from "firebase/firestore";
-import { db } from "./firebase";
+import { db } from "./services/firebase";
 import {
   setCategories,
   setAllCourses,
@@ -224,7 +224,7 @@ const Dashboard: React.FC = () => {
   };
 
   const handleAddCourse = () => {
-    navigate('/new-course');
+    navigate('/course/new');
   };
 
   const handleCourseClick = (courseId: string) => {
